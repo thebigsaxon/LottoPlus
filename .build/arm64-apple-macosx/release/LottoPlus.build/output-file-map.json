@@ -1,0 +1,25 @@
+{
+  "": {
+    "dependencies": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/LottoPlus.d",
+    "object": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/LottoPlus.o",
+    "swift-dependencies": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/primary.swiftdeps"
+  },
+  "/Users/danstutzman/Documents/GitHub/LottoPlus/LottoPlusApp/ContentView.swift": {
+    "object": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/ContentView.swift.o",
+    "swiftmodule": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/ContentView.dia"
+  },
+  "/Users/danstutzman/Documents/GitHub/LottoPlus/LottoPlusApp/LottoPlusApp.swift": {
+    "object": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/LottoPlusApp.swift.o",
+    "swiftmodule": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/LottoPlusApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/LottoPlusApp.swiftdeps",
+    "diagnostics": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/LottoPlusApp.dia"
+  },
+  "/Users/danstutzman/Documents/GitHub/LottoPlus/LottoPlusApp/WebView.swift": {
+    "object": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/WebView.swift.o",
+    "swiftmodule": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/WebView~partial.swiftmodule",
+    "swift-dependencies": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/WebView.swiftdeps",
+    "diagnostics": "/Users/danstutzman/Documents/GitHub/LottoPlus/.build/arm64-apple-macosx/release/LottoPlus.build/WebView.dia"
+  }
+}

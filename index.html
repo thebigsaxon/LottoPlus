@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LottoPlus - Lottery Digit Grid & Pattern Tracker</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* LottoPlus Design System & Styles */
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: rgba(18, 26, 44, 0.75);
+      --bg-card-hover: rgba(28, 38, 62, 0.85);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --border-highlight: rgba(99, 102, 241, 0.4);
+      
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+
+      /* Accent Colors */
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --powerball-red: #ef4444;
+      --powerball-glow: rgba(239, 68, 68, 0.4);
+      --megamillions-gold: #f59e0b;
+      --megamillions-glow: rgba(245, 158, 11, 0.4);
+      --cash5-green: #10b981;
+      --cash5-glow: rgba(16, 185, 129, 0.4);
+      --cyan-neon: #06b6d4;
+      --pink-neon: #ec4899;
+
+      /* Cell Dimensions */
+      --cell-size: 38px;
+      --cell-gap: 3px;
+      --ball-separator-width: 12px;
+
+      --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 10% 10%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 90% 90%, rgba(16, 185, 129, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(245, 158, 11, 0.08) 0px, transparent 60%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: auto;
+    }
+
+    /* App Header */
+    .header {
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-primary), #a855f7);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.2rem;
+      color: white;
+      box-shadow: 0 0 15px var(--accent-primary-glow);
+    }
+
+    .brand-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #ffffff, #d1d5db);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* Game Selector Tabs */
+    .game-tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-main);
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      color: white;
+      background: var(--accent-primary);
+      box-shadow: 0 0 12px var(--accent-primary-glow);
+    }
+
+    .tab-btn.game-powerball.active {
+      background: var(--powerball-red);
+      box-shadow: 0 0 14px var(--powerball-glow);
+    }
+
+    .tab-btn.game-megamillions.active {
+      background: var(--megamillions-gold);
+      color: #0b0f19;
+      box-shadow: 0 0 14px var(--megamillions-glow);
+    }
+
+    .tab-btn.game-cash5.active {
+      background: var(--cash5-green);
+      box-shadow: 0 0 14px var(--cash5-glow);
+    }
+
+    /* Header Actions */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-family: var(--font-main);
+      font-weight: 500;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-primary), #4f46e5);
+      border-color: transparent;
+      color: white;
+      box-shadow: 0 4px 12px var(--accent-primary-glow);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #4f46e5, #4338ca);
+      box-shadow: 0 6px 16px var(--accent-primary-glow);
+    }
+
+    /* Main Layout */
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Sidebar Tool Panel */
+    .sidebar {
+      width: 320px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      padding: 1.25rem;
+      overflow-y: auto;
+      z-index: 20;
+    }
+
+    .panel-section {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+
+    .section-title {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Tool Buttons Group */
+    .tool-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .tool-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.6rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-family: var(--font-main);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .tool-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+    }
+
+    .tool-btn.active {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--accent-primary);
+      color: white;
+      box-shadow: 0 0 10px var(--accent-primary-glow);
+    }
+
+    /* Color & Style Palette */
+    .color-picker {
+      display: flex;
+      gap: 8px;
+      margin-top: 0.5rem;
+    }
+
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .color-swatch:hover {
+      transform: scale(1.15);
+    }
+
+    .color-swatch.active {
+      border-color: white;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    /* Automated Pattern Options */
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      accent-color: var(--accent-primary);
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    /* Digit Matrix Grid Area */
+    .grid-viewport {
+      flex: 1;
+      position: relative;
+      overflow: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .grid-wrapper {
+      position: relative;
+      display: inline-block;
+      user-select: none;
+    }
+
+    /* SVG Line Overlay Layer */
+    .svg-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 15;
+    }
+
+    .svg-overlay path, .svg-overlay line {
+      pointer-events: stroke;
+      cursor: pointer;
+      transition: stroke-width 0.15s ease;
+    }
+
+    .svg-overlay path:hover, .svg-overlay line:hover {
+      stroke-width: 5px !important;
+    }
+
+    /* Table / Grid Matrix Styling */
+    .grid-table {
+      border-collapse: separate;
+      border-spacing: var(--cell-gap);
+      position: relative;
+      z-index: 10;
+    }
+
+    .grid-table th {
+      padding: 8px 4px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      background: rgba(11, 15, 25, 0.95);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+
+    .grid-table td {
+      padding: 0;
+    }
+
+    .date-cell {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 0 10px;
+      white-space: nowrap;
+      vertical-align: middle;
+      text-align: right;
+    }
+
+    .square-cell {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .square-cell:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: scale(1.06);
+      z-index: 12;
+    }
+
+    /* Cell Variations */
+    .square-cell.tens {
+      color: #d1d5db;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .square-cell.ones {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .square-cell.bonus {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+    }
+
+    .square-cell.bonus-gold {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fcd34d;
+    }
+
+    /* Highlighting states */
+    .square-cell.highlighted {
+      background: rgba(99, 102, 241, 0.35) !important;
+      border-color: var(--accent-primary) !important;
+      color: white !important;
+      box-shadow: 0 0 12px var(--accent-primary-glow);
+      transform: scale(1.08);
+      z-index: 13;
+    }
+
+    .square-cell.start-node {
+      border-color: var(--cyan-neon) !important;
+      box-shadow: 0 0 12px var(--cyan-neon) !important;
+      animation: pulse-border 1.2s infinite alternate;
+    }
+
+    @keyframes pulse-border {
+      0% { border-color: var(--cyan-neon); box-shadow: 0 0 6px var(--cyan-neon); }
+      100% { border-color: #ffffff; box-shadow: 0 0 16px var(--cyan-neon); }
+    }
+
+    /* Column separators between lottery numbers */
+    .ball-sep {
+      width: var(--ball-separator-width);
+      position: relative;
+    }
+
+    .ball-sep::after {
+      content: '';
+      position: absolute;
+      top: 15%;
+      bottom: 15%;
+      left: 50%;
+      width: 1px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Digit Stats & Heatmap Drawer */
+    .stats-bar {
+      margin-top: 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .heatmap-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .heatmap-digit {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .heatmap-bar-container {
+      width: 100%;
+      height: 28px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      display: flex;
+      align-items: flex-end;
+      padding: 2px;
+      overflow: hidden;
+    }
+
+    .heatmap-bar-fill {
+      width: 100%;
+      background: linear-gradient(to top, var(--accent-primary), var(--cyan-neon));
+      border-radius: 4px;
+      transition: height 0.3s ease;
+    }
+
+    .heatmap-count {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: #121a2c;
+      border: 1px solid var(--border-highlight);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 580px;
+      padding: 1.5rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .close-btn:hover { color: white; }
+
+    /* Dropzone for CSV */
+    .dropzone {
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: var(--accent-primary);
+      background: rgba(99, 102, 241, 0.08);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .form-input, .form-select {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.6rem 0.8rem;
+      color: white;
+      font-family: var(--font-main);
+      font-size: 0.9rem;
+    }
+
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+    }
+
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      background: #1e293b;
+      border: 1px solid var(--border-highlight);
+      color: white;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slide-in 0.25s ease-out;
+    }
+
+    @keyframes slide-in {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top App Navigation Bar -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-logo">L+</div>
+      <div>
+        <div class="brand-title">LottoPlus</div>
+        <div class="brand-subtitle">Digit Matrix & Visual Pattern Analyzer</div>
+      </div>
+    </div>
+
+    <!-- Game Selector Tabs -->
+    <nav class="game-tabs">
+      <button class="tab-btn game-powerball active" data-game="powerball">
+        <span>🔴</span> Powerball
+      </button>
+      <button class="tab-btn game-megamillions" data-game="megamillions">
+        <span>🟡</span> Mega Millions
+      </button>
+      <button class="tab-btn game-cash5" data-game="cash5">
+        <span>🟢</span> Cash 5
+      </button>
+    </nav>
+
+    <!-- Global Actions -->
+    <div class="header-actions">
+      <button class="btn" id="btnLoadSample" title="Load sample historical draws">
+        <span>🎲</span> Load Sample Data
+      </button>
+      <button class="btn" id="btnImportCsv">
+        <span>📥</span> Import CSV
+      </button>
+      <button class="btn" id="btnOpenProject">
+        <span>📂</span> Open Project
+      </button>
+      <button class="btn btn-primary" id="btnSaveProject">
+        <span>💾</span> Save Project File
+      </button>
+      <input type="file" id="projectFileInput" accept=".lottoplus,.json" style="display: none;">
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="main-container">
+    
+    <!-- Sidebar Control Panel -->
+    <aside class="sidebar">
+      
+      <!-- Interactive Connection Tools -->
+      <div class="panel-section">
+        <div class="section-title">
+          <span>Interactive Connectors</span>
+        </div>
+        <div class="tool-grid">
+          <button class="tool-btn active" data-tool="select">
+            <span style="font-size: 1.2rem;">👆</span>
+            <span>Select & Inspect</span>
+          </button>
+          <button class="tool-btn" data-tool="connect-line">
+            <span style="font-size: 1.2rem;">📏</span>
+            <span>Draw Line</span>
+          </button>
+          <button class="tool-btn" data-tool="connect-arrow">
+            <span style="font-size: 1.2rem;">↗️</span>
+            <span>Draw Arrow</span>
+          </button>
+          <button class="tool-btn" data-tool="erase">
+            <span style="font-size: 1.2rem;">🧹</span>
+            <span>Erase Line</span>
+          </button>
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <div class="form-label">Line Color</div>
+          <div class="color-picker">
+            <div class="color-swatch active" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan Neon"></div>
+            <div class="color-swatch" data-color="#ec4899" style="background: #ec4899;" title="Pink Neon"></div>
+            <div class="color-swatch" data-color="#f59e0b" style="background: #f59e0b;" title="Gold Amber"></div>
+            <div class="color-swatch" data-color="#6366f1" style="background: #6366f1;" title="Indigo Glow"></div>
+            <div class="color-swatch" data-color="#10b981" style="background: #10b981;" title="Emerald Green"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Automated Pattern Filters -->
+      <div class="panel-section">
+        <div class="section-title">
+          <span>Automated Patterns</span>
+        </div>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkMatches" checked>
+            <span>Highlight Matching Digits</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkVerticalRuns">
+            <span>Connect Vertical Runs (3+)</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkDiagonalRuns">
+            <span>Connect Diagonal Matches</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Date & Sorting Filters -->
+      <div class="panel-section">
+        <div class="section-title">
+          <span>Date Filters & Order</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div class="form-group">
+            <label class="form-label">From Date</label>
+            <input type="date" id="startDateInput" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">To Date</label>
+            <input type="date" id="endDateInput" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <select id="sortOrderSelect" class="form-select">
+              <option value="desc">Newest Draws First</option>
+              <option value="asc">Oldest Draws First</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Grid Viewport Area -->
+    <main class="grid-viewport">
+      <div class="grid-wrapper" id="gridWrapper">
+        <svg class="svg-overlay" id="svgOverlay"></svg>
+        <div id="gridContainer"></div>
+      </div>
+
+      <!-- Digit Frequency Heatmap Drawer -->
+      <div style="width: 100%; margin-top: 1.5rem;">
+        <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.5rem;">
+          Single-Digit Distribution Heatmap (0 - 9)
+        </div>
+        <div class="stats-bar" id="statsBar"></div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- CSV Import Modal -->
+  <div class="modal-backdrop" id="csvModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Import CSV Draw Records</h3>
+        <button class="close-btn close-modal">&times;</button>
+      </div>
+      <div>
+        <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+          Upload a CSV file containing lottery draw dates and numbers. LottoPlus automatically maps columns for Main Balls, Bonus/Powerball, and Draw Dates.
+        </p>
+        <div class="dropzone" id="csvDropzone">
+          <span style="font-size: 2rem;">📄</span>
+          <div>
+            <strong style="color: white;">Click to browse</strong> or drag & drop CSV file
+          </div>
+          <span style="font-size: 0.78rem; color: var(--text-muted);">Supports .csv files formatted as Date, Ball 1, Ball 2...</span>
+          <input type="file" id="csvFileInput" accept=".csv,.txt" style="display: none;">
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button class="btn close-modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Embedded Self-Contained JavaScript -->
+  <script>
+    // Sample Datasets
+    const SAMPLE_POWERBALL = [
+      { id: "pb-1", date: "2026-08-03", numbers: [3, 14, 28, 44, 59], bonus: 12, multiplier: 3 },
+      { id: "pb-2", date: "2026-08-01", numbers: [7, 19, 32, 41, 68], bonus: 4, multiplier: 2 },
+      { id: "pb-3", date: "2026-07-29", numbers: [1, 24, 32, 44, 60], bonus: 18, multiplier: 4 },
+      { id: "pb-4", date: "2026-07-27", numbers: [12, 26, 35, 51, 62], bonus: 9, multiplier: 2 },
+      { id: "pb-5", date: "2026-07-25", numbers: [5, 18, 29, 44, 53], bonus: 24, multiplier: 3 },
+      { id: "pb-6", date: "2026-07-22", numbers: [8, 22, 34, 49, 65], bonus: 15, multiplier: 5 },
+      { id: "pb-7", date: "2026-07-20", numbers: [2, 14, 30, 42, 57], bonus: 7, multiplier: 2 },
+      { id: "pb-8", date: "2026-07-18", numbers: [9, 21, 38, 47, 61], bonus: 11, multiplier: 3 },
+      { id: "pb-9", date: "2026-07-15", numbers: [4, 16, 27, 40, 58], bonus: 22, multiplier: 2 },
+      { id: "pb-10", date: "2026-07-13", numbers: [11, 25, 33, 46, 69], bonus: 1, multiplier: 4 },
+      { id: "pb-11", date: "2026-07-11", numbers: [6, 17, 31, 48, 64], bonus: 19, multiplier: 3 },
+      { id: "pb-12", date: "2026-07-08", numbers: [15, 23, 36, 50, 67], bonus: 8, multiplier: 2 },
+    ];
+
+    const SAMPLE_MEGA_MILLIONS = [
+      { id: "mm-1", date: "2026-08-04", numbers: [10, 24, 38, 45, 62], bonus: 14, multiplier: 3 },
+      { id: "mm-2", date: "2026-07-31", numbers: [4, 18, 29, 52, 69], bonus: 8, multiplier: 4 },
+      { id: "mm-3", date: "2026-07-28", numbers: [15, 27, 34, 48, 70], bonus: 21, multiplier: 2 },
+      { id: "mm-4", date: "2026-07-24", numbers: [2, 11, 36, 43, 58], bonus: 5, multiplier: 3 },
+      { id: "mm-5", date: "2026-07-21", numbers: [9, 20, 31, 49, 66], bonus: 17, multiplier: 5 },
+      { id: "mm-6", date: "2026-07-17", numbers: [6, 14, 25, 41, 63], bonus: 12, multiplier: 2 },
+      { id: "mm-7", date: "2026-07-14", numbers: [1, 23, 39, 50, 67], bonus: 25, multiplier: 3 },
+      { id: "mm-8", date: "2026-07-10", numbers: [13, 22, 35, 47, 61], bonus: 9, multiplier: 4 },
+      { id: "mm-9", date: "2026-07-07", numbers: [8, 19, 32, 44, 68], bonus: 3, multiplier: 2 },
+      { id: "mm-10", date: "2026-07-03", numbers: [5, 17, 28, 40, 59], bonus: 19, multiplier: 3 },
+    ];
+
+    const SAMPLE_CASH_5 = [
+      { id: "c5-1", date: "2026-08-03", numbers: [4, 12, 23, 31, 40] },
+      { id: "c5-2", date: "2026-08-02", numbers: [9, 18, 24, 35, 41] },
+      { id: "c5-3", date: "2026-08-01", numbers: [1, 14, 22, 33, 42] },
+      { id: "c5-4", date: "2026-07-31", numbers: [7, 15, 29, 36, 39] },
+      { id: "c5-5", date: "2026-07-30", numbers: [3, 11, 20, 30, 43] },
+      { id: "c5-6", date: "2026-07-29", numbers: [8, 16, 25, 34, 38] },
+      { id: "c5-7", date: "2026-07-28", numbers: [2, 19, 27, 32, 41] },
+      { id: "c5-8", date: "2026-07-27", numbers: [5, 13, 21, 37, 40] },
+      { id: "c5-9", date: "2026-07-26", numbers: [10, 17, 26, 31, 42] },
+      { id: "c5-10", date: "2026-07-25", numbers: [6, 14, 28, 35, 43] },
+    ];
+
+    // CSV Parser Utilities
+    function parseCSV(csvText) {
+      const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length === 0) return { headers: [], rows: [] };
+
+      const firstLine = lines[0];
+      let sep = ',';
+      if (firstLine.includes('\t')) sep = '\t';
+      else if (firstLine.includes(';')) sep = ';';
+
+      const rows = lines.map(line => {
+        const regex = new RegExp(`(?:^|${sep})(?:"([^"]*)"|([^"${sep}]*))`, 'g');
+        const matches = [];
+        let match;
+        while ((match = regex.exec(line)) !== null) {
+          matches.push((match[1] !== undefined ? match[1] : match[2]).trim());
+        }
+        return matches;
+      });
+
+      return { headers: rows[0], rows: rows.slice(1) };
+    }
+
+    function autoMapColumns(headers) {
+      const mapping = { dateIndex: -1, ballIndices: [], bonusIndex: -1, multiplierIndex: -1 };
+      headers.forEach((h, idx) => {
+        const lower = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (lower.includes('date') || lower.includes('draw')) {
+          if (mapping.dateIndex === -1) mapping.dateIndex = idx;
+        } else if (lower.includes('powerball') || lower.includes('megaball') || lower.includes('bonus') || lower.includes('pb') || lower.includes('mb')) {
+          if (mapping.bonusIndex === -1) mapping.bonusIndex = idx;
+        } else if (lower.includes('multiplier') || lower.includes('powerplay') || lower.includes('megaplier')) {
+          if (mapping.multiplierIndex === -1) mapping.multiplierIndex = idx;
+        } else if (lower.includes('ball') || lower.includes('num') || lower.includes('n') || /^\d+$/.test(lower)) {
+          mapping.ballIndices.push(idx);
+        }
+      });
+      if (mapping.ballIndices.length === 0) {
+        headers.forEach((h, idx) => {
+          if (idx !== mapping.dateIndex && idx !== mapping.bonusIndex && idx !== mapping.multiplierIndex) {
+            mapping.ballIndices.push(idx);
+          }
+        });
+      }
+      return mapping;
+    }
+
+    function convertRowsToDraws(headers, dataRows, mapping, gameType) {
+      const draws = [];
+      dataRows.forEach((row, i) => {
+        if (row.length <= 1) return;
+        let rawDate = mapping.dateIndex >= 0 ? row[mapping.dateIndex] : new Date().toISOString().split('T')[0];
+        let parsedDate = normalizeDate(rawDate);
+        let numbers = mapping.ballIndices.map(idx => parseInt(row[idx], 10)).filter(n => !isNaN(n));
+        numbers.sort((a, b) => a - b);
+        let bonus = mapping.bonusIndex >= 0 ? parseInt(row[mapping.bonusIndex], 10) : null;
+        if (isNaN(bonus)) bonus = null;
+        let multiplier = mapping.multiplierIndex >= 0 ? parseInt(row[mapping.multiplierIndex], 10) : null;
+
+        if (numbers.length > 0) {
+          draws.push({ id: `csv-${Date.now()}-${i}`, date: parsedDate, numbers, bonus, multiplier });
+        }
+      });
+      draws.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return draws;
+    }
+
+    function normalizeDate(dateStr) {
+      if (!dateStr) return new Date().toISOString().split('T')[0];
+      const clean = dateStr.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+      const mdy = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (mdy) {
+        return `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
+      }
+      const d = new Date(clean);
+      return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : clean;
+    }
+
+    // Pattern Detection Engine
+    function generateAutomatedPatterns(draws, settings = {}) {
+      const { showMatches = true, showVerticalRuns = false, showDiagonalRuns = false, colorMatch = "#06b6d4", colorRun = "#ec4899" } = settings;
+      const lines = [];
+      if (!draws || draws.length < 2) return lines;
+
+      const gridRows = draws.map((draw, rowIndex) => {
+        const cells = [];
+        let colIndex = 0;
+        draw.numbers.forEach((num, ballIdx) => {
+          const formatted = num.toString().padStart(2, '0');
+          cells.push({ id: `${draw.id}-b${ballIdx}-tens`, drawId: draw.id, rowIndex, colIndex: colIndex++, digit: parseInt(formatted[0], 10) });
+          cells.push({ id: `${draw.id}-b${ballIdx}-ones`, drawId: draw.id, rowIndex, colIndex: colIndex++, digit: parseInt(formatted[1], 10) });
+        });
+        if (draw.bonus !== null && draw.bonus !== undefined) {
+          const formatted = draw.bonus.toString().padStart(2, '0');
+          cells.push({ id: `${draw.id}-bonus-tens`, drawId: draw.id, rowIndex, colIndex: colIndex++, digit: parseInt(formatted[0], 10) });
+          cells.push({ id: `${draw.id}-bonus-ones`, drawId: draw.id, rowIndex, colIndex: colIndex++, digit: parseInt(formatted[1], 10) });
+        }
+        return cells;
+      });
+
+      if (showMatches) {
+        for (let r = 0; r < gridRows.length - 1; r++) {
+          gridRows[r].forEach(cellA => {
+            gridRows[r + 1].forEach(cellB => {
+              if (cellA.digit === cellB.digit && Math.abs(cellA.colIndex - cellB.colIndex) <= 2) {
+                lines.push({ id: `auto-match-${cellA.id}-${cellB.id}`, fromCellId: cellA.id, toCellId: cellB.id, color: colorMatch, style: "glow", isArrow: false, label: `Digit ${cellA.digit}`, isAuto: true });
+              }
+            });
+          });
+        }
+      }
+
+      if (showVerticalRuns) {
+        const numCols = gridRows[0] ? gridRows[0].length : 0;
+        for (let c = 0; c < numCols; c++) {
+          for (let r = 0; r < gridRows.length - 2; r++) {
+            const c1 = gridRows[r][c], c2 = gridRows[r+1][c], c3 = gridRows[r+2][c];
+            if (c1 && c2 && c3 && c1.digit === c2.digit && c2.digit === c3.digit) {
+              lines.push({ id: `auto-vrun-${c1.id}-${c3.id}`, fromCellId: c1.id, toCellId: c3.id, color: colorRun, style: "solid", isArrow: true, label: `Vertical Run: ${c1.digit}`, isAuto: true });
+            }
+          }
+        }
+      }
+
+      if (showDiagonalRuns) {
+        for (let r = 0; r < gridRows.length - 1; r++) {
+          for (let c = 0; c < gridRows[r].length; c++) {
+            const cell = gridRows[r][c];
+            if (!cell) continue;
+            if (c + 1 < gridRows[r+1].length && gridRows[r+1][c+1].digit === cell.digit) {
+              lines.push({ id: `auto-diag-r-${cell.id}-${gridRows[r+1][c+1].id}`, fromCellId: cell.id, toCellId: gridRows[r+1][c+1].id, color: colorRun, style: "dashed", isArrow: true, label: "Diagonal Match", isAuto: true });
+            }
+            if (c - 1 >= 0 && gridRows[r+1][c-1].digit === cell.digit) {
+              lines.push({ id: `auto-diag-l-${cell.id}-${gridRows[r+1][c-1].id}`, fromCellId: cell.id, toCellId: gridRows[r+1][c-1].id, color: colorRun, style: "dashed", isArrow: true, label: "Diagonal Match", isAuto: true });
+            }
+          }
+        }
+      }
+      return lines;
+    }
+
+    // Connection Engine
+    class ConnectionEngine {
+      constructor(svgElement, gridTableElement) {
+        this.svg = svgElement;
+        this.gridTable = gridTableElement;
+        this.lines = [];
+        this.manualLines = [];
+        this.autoLines = [];
+        this.activeTool = "select";
+        this.selectedColor = "#06b6d4";
+        this.selectedStyle = "glow";
+        this.startNodeCell = null;
+        this.onLineAddedCallback = null;
+        this.onLineRemovedCallback = null;
+        window.addEventListener("resize", () => this.render());
+      }
+
+      setLines(manualLines = [], autoLines = []) {
+        this.manualLines = manualLines;
+        this.autoLines = autoLines;
+        this.lines = [...manualLines, ...autoLines];
+        this.render();
+      }
+
+      setTool(tool) {
+        this.activeTool = tool;
+        if (tool !== "connect-line" && tool !== "connect-arrow") this.clearStartNode();
+      }
+
+      setColor(color) { this.selectedColor = color; }
+      setStyle(style) { this.selectedStyle = style; }
+
+      clearStartNode() {
+        if (this.startNodeCell) {
+          this.startNodeCell.classList.remove("start-node");
+          this.startNodeCell = null;
+        }
+      }
+
+      handleCellClick(cellElement, cellId) {
+        if (this.activeTool === "connect-line" || this.activeTool === "connect-arrow") {
+          if (!this.startNodeCell) {
+            this.startNodeCell = cellElement;
+            cellElement.classList.add("start-node");
+          } else {
+            const startCellId = this.startNodeCell.dataset.cellId;
+            if (startCellId !== cellId) {
+              const newLine = {
+                id: `line-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                fromCellId: startCellId,
+                toCellId: cellId,
+                color: this.selectedColor,
+                style: this.selectedStyle,
+                isArrow: this.activeTool === "connect-arrow",
+                label: "",
+                isAuto: false
+              };
+              this.manualLines.push(newLine);
+              this.lines.push(newLine);
+              this.render();
+              if (this.onLineAddedCallback) this.onLineAddedCallback(newLine);
+            }
+            this.clearStartNode();
+          }
+        }
+      }
+
+      getCellCenter(cellId) {
+        const cell = this.gridTable.querySelector(`[data-cell-id="${cellId}"]`);
+        if (!cell) return null;
+        const cellRect = cell.getBoundingClientRect();
+        const svgRect = this.svg.getBoundingClientRect();
+        return {
+          x: cellRect.left + cellRect.width / 2 - svgRect.left,
+          y: cellRect.top + cellRect.height / 2 - svgRect.top
+        };
+      }
+
+      render() {
+        if (!this.svg || !this.gridTable) return;
+        const wrapper = this.gridTable.parentElement;
+        if (wrapper) {
+          this.svg.setAttribute("width", wrapper.offsetWidth);
+          this.svg.setAttribute("height", wrapper.offsetHeight);
+        }
+        this.svg.innerHTML = `
+          <defs>
+            <marker id="arrow-cyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
+            </marker>
+            <marker id="arrow-pink" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ec4899" />
+            </marker>
+            <marker id="arrow-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+            </marker>
+            <marker id="arrow-indigo" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1" />
+            </marker>
+            <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+        `;
+
+        this.lines.forEach(line => {
+          const start = this.getCellCenter(line.fromCellId);
+          const end = this.getCellCenter(line.toCellId);
+          if (!start || !end) return;
+
+          const pathGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          pathGroup.dataset.lineId = line.id;
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+
+          const dx = end.x - start.x, dy = end.y - start.y;
+          let dStr = `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+          if (Math.abs(dy) > 50 && Math.abs(dx) > 20) {
+            dStr = `M ${start.x} ${start.y} C ${start.x} ${start.y + dy * 0.4}, ${end.x} ${end.y - dy * 0.4}, ${end.x} ${end.y}`;
+          }
+
+          path.setAttribute("d", dStr);
+          path.setAttribute("stroke", line.color || "#06b6d4");
+          path.setAttribute("stroke-width", line.isAuto ? "2" : "3");
+          path.setAttribute("fill", "none");
+          path.setAttribute("stroke-linecap", "round");
+          if (line.style === "dashed") path.setAttribute("stroke-dasharray", "6 4");
+          if (line.style === "glow") path.setAttribute("filter", "url(#glow-filter)");
+
+          if (line.isArrow) {
+            let markerId = "arrow-cyan";
+            if (line.color === "#ec4899") markerId = "arrow-pink";
+            else if (line.color === "#f59e0b") markerId = "arrow-gold";
+            else if (line.color === "#6366f1") markerId = "arrow-indigo";
+            path.setAttribute("marker-end", `url(#${markerId})`);
+          }
+
+          path.addEventListener("click", (e) => {
+            if (this.activeTool === "erase") {
+              e.stopPropagation();
+              this.removeLine(line.id);
+            }
+          });
+
+          pathGroup.appendChild(path);
+          this.svg.appendChild(pathGroup);
+        });
+      }
+
+      removeLine(lineId) {
+        this.manualLines = this.manualLines.filter(l => l.id !== lineId);
+        this.autoLines = this.autoLines.filter(l => l.id !== lineId);
+        this.lines = this.lines.filter(l => l.id !== lineId);
+        this.render();
+        if (this.onLineRemovedCallback) this.onLineRemovedCallback(lineId);
+      }
+    }
+
+    // Grid Matrix Class
+    class GridMatrix {
+      constructor(container) {
+        this.container = container;
+        this.draws = [];
+        this.gameType = "powerball";
+        this.highlightedDigit = null;
+        this.onCellClickCallback = null;
+      }
+
+      setDraws(draws, gameType) {
+        this.draws = draws;
+        this.gameType = gameType;
+        this.render();
+      }
+
+      setHighlightedDigit(digit) {
+        this.highlightedDigit = digit;
+        this.updateHighlights();
+      }
+
+      render() {
+        if (!this.container) return;
+        if (!this.draws || this.draws.length === 0) {
+          this.container.innerHTML = `<div style="padding:3rem;text-align:center;color:var(--text-muted);"><h3>No draw data available</h3></div>`;
+          return;
+        }
+        const firstDraw = this.draws[0];
+        const numBalls = firstDraw.numbers ? firstDraw.numbers.length : 5;
+        const hasBonus = firstDraw.bonus !== null && firstDraw.bonus !== undefined;
+
+        let headerHTML = `<thead><tr><th>Draw Date</th>`;
+        for (let b = 1; b <= numBalls; b++) {
+          headerHTML += `<th colspan="2">Ball ${b}</th>`;
+          if (b < numBalls || hasBonus) headerHTML += `<th class="ball-sep"></th>`;
+        }
+        if (hasBonus) {
+          const bonusName = this.gameType === "powerball" ? "Powerball" : (this.gameType === "megamillions" ? "Mega Ball" : "Bonus");
+          headerHTML += `<th colspan="2" style="color:${this.gameType === 'powerball' ? 'var(--powerball-red)' : 'var(--megamillions-gold)'}">${bonusName}</th>`;
+        }
+        headerHTML += `</tr></thead>`;
+
+        let bodyHTML = `<tbody>`;
+        this.draws.forEach(draw => {
+          bodyHTML += `<tr><td class="date-cell">${draw.date}</td>`;
+          draw.numbers.forEach((num, ballIdx) => {
+            const formatted = num.toString().padStart(2, '0');
+            const tensDigit = formatted[0], onesDigit = formatted[1];
+            bodyHTML += `
+              <td><div class="square-cell tens" data-cell-id="${draw.id}-b${ballIdx}-tens" data-digit="${tensDigit}">${tensDigit}</div></td>
+              <td><div class="square-cell ones" data-cell-id="${draw.id}-b${ballIdx}-ones" data-digit="${onesDigit}">${onesDigit}</div></td>
+            `;
+            if (ballIdx < numBalls - 1 || hasBonus) bodyHTML += `<td class="ball-sep"></td>`;
+          });
+
+          if (hasBonus) {
+            const formatted = draw.bonus.toString().padStart(2, '0');
+            const tensDigit = formatted[0], onesDigit = formatted[1];
+            const bonusClass = this.gameType === "megamillions" ? "bonus-gold" : "bonus";
+            bodyHTML += `
+              <td><div class="square-cell ${bonusClass}" data-cell-id="${draw.id}-bonus-tens" data-digit="${tensDigit}">${tensDigit}</div></td>
+              <td><div class="square-cell ${bonusClass}" data-cell-id="${draw.id}-bonus-ones" data-digit="${onesDigit}">${onesDigit}</div></td>
+            `;
+          }
+          bodyHTML += `</tr>`;
+        });
+        bodyHTML += `</tbody>`;
+
+        this.container.innerHTML = `<table class="grid-table" id="matrixTable">${headerHTML}${bodyHTML}</table>`;
+        this.attachCellEvents();
+        this.updateHighlights();
+      }
+
+      attachCellEvents() {
+        const cells = this.container.querySelectorAll(".square-cell");
+        cells.forEach(cell => {
+          cell.addEventListener("click", () => {
+            if (this.onCellClickCallback) {
+              this.onCellClickCallback(cell, cell.dataset.cellId, parseInt(cell.dataset.digit, 10));
+            }
+          });
+        });
+      }
+
+      updateHighlights() {
+        const cells = this.container.querySelectorAll(".square-cell");
+        cells.forEach(cell => {
+          const digit = parseInt(cell.dataset.digit, 10);
+          if (this.highlightedDigit !== null && digit === this.highlightedDigit) {
+            cell.classList.add("highlighted");
+          } else {
+            cell.classList.remove("highlighted");
+          }
+        });
+      }
+    }
+
+    // App Orchestrator
+    class LottoPlusApp {
+      constructor() {
+        this.activeGame = "powerball";
+        this.draws = [...SAMPLE_POWERBALL];
+        this.filteredDraws = [...this.draws];
+        this.manualLines = [];
+        this.autoLines = [];
+        this.activeDigitHighlight = null;
+        this.patternSettings = { showMatches: true, showVerticalRuns: false, showDiagonalRuns: false };
+
+        document.addEventListener("DOMContentLoaded", () => this.init());
+      }
+
+      init() {
+        this.gridContainer = document.getElementById("gridContainer");
+        this.svgOverlay = document.getElementById("svgOverlay");
+        this.gameTabs = document.querySelectorAll(".tab-btn");
+        this.btnImportCsv = document.getElementById("btnImportCsv");
+        this.btnSaveProject = document.getElementById("btnSaveProject");
+        this.btnOpenProject = document.getElementById("btnOpenProject");
+        this.btnLoadSample = document.getElementById("btnLoadSample");
+        this.startDateInput = document.getElementById("startDateInput");
+        this.endDateInput = document.getElementById("endDateInput");
+        this.sortOrderSelect = document.getElementById("sortOrderSelect");
+        this.toolBtns = document.querySelectorAll(".tool-btn");
+        this.colorSwatches = document.querySelectorAll(".color-swatch");
+        this.chkMatches = document.getElementById("chkMatches");
+        this.chkVerticalRuns = document.getElementById("chkVerticalRuns");
+        this.chkDiagonalRuns = document.getElementById("chkDiagonalRuns");
+        this.csvModal = document.getElementById("csvModal");
+        this.csvFileInput = document.getElementById("csvFileInput");
+        this.csvDropzone = document.getElementById("csvDropzone");
+        this.statsBar = document.getElementById("statsBar");
+        this.projectFileInput = document.getElementById("projectFileInput");
+
+        this.gridMatrix = new GridMatrix(this.gridContainer);
+        this.connectionEngine = new ConnectionEngine(this.svgOverlay, this.gridContainer);
+
+        this.gridMatrix.onCellClickCallback = (cellElement, cellId, digit) => {
+          if (this.connectionEngine.activeTool === "select") {
+            this.activeDigitHighlight = this.activeDigitHighlight === digit ? null : digit;
+            this.gridMatrix.setHighlightedDigit(this.activeDigitHighlight);
+          } else {
+            this.connectionEngine.handleCellClick(cellElement, cellId);
+          }
+        };
+
+        this.connectionEngine.onLineAddedCallback = (newLine) => {
+          this.manualLines.push(newLine);
+          this.saveToLocalStorage();
+          this.showToast("Connection created!");
+        };
+
+        this.connectionEngine.onLineRemovedCallback = (lineId) => {
+          this.manualLines = this.manualLines.filter(l => l.id !== lineId);
+          this.saveToLocalStorage();
+          this.showToast("Connection erased.");
+        };
+
+        this.bindEvents();
+        this.loadFromLocalStorage();
+        this.updateState();
+      }
+
+      bindEvents() {
+        this.gameTabs.forEach(tab => {
+          tab.addEventListener("click", () => this.switchGame(tab.dataset.game));
+        });
+        this.toolBtns.forEach(btn => {
+          btn.addEventListener("click", () => {
+            this.toolBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            this.connectionEngine.setTool(btn.dataset.tool);
+          });
+        });
+        this.colorSwatches.forEach(swatch => {
+          swatch.addEventListener("click", () => {
+            this.colorSwatches.forEach(s => s.classList.remove("active"));
+            swatch.classList.add("active");
+            this.connectionEngine.setColor(swatch.dataset.color);
+          });
+        });
+
+        if (this.chkMatches) this.chkMatches.addEventListener("change", (e) => { this.patternSettings.showMatches = e.target.checked; this.updateLines(); });
+        if (this.chkVerticalRuns) this.chkVerticalRuns.addEventListener("change", (e) => { this.patternSettings.showVerticalRuns = e.target.checked; this.updateLines(); });
+        if (this.chkDiagonalRuns) this.chkDiagonalRuns.addEventListener("change", (e) => { this.patternSettings.showDiagonalRuns = e.target.checked; this.updateLines(); });
+
+        if (this.startDateInput) this.startDateInput.addEventListener("change", () => this.applyFilters());
+        if (this.endDateInput) this.endDateInput.addEventListener("change", () => this.applyFilters());
+        if (this.sortOrderSelect) this.sortOrderSelect.addEventListener("change", () => this.applyFilters());
+
+        if (this.btnLoadSample) this.btnLoadSample.addEventListener("click", () => this.loadSampleData(this.activeGame));
+        if (this.btnSaveProject) this.btnSaveProject.addEventListener("click", () => this.exportProjectFile());
+        if (this.btnOpenProject) this.btnOpenProject.addEventListener("click", () => this.projectFileInput.click());
+        if (this.projectFileInput) this.projectFileInput.addEventListener("change", (e) => this.importProjectFile(e));
+
+        if (this.btnImportCsv) this.btnImportCsv.addEventListener("click", () => this.csvModal.classList.add("active"));
+        document.querySelectorAll(".close-modal").forEach(btn => btn.addEventListener("click", () => this.csvModal.classList.remove("active")));
+
+        if (this.csvDropzone) {
+          this.csvDropzone.addEventListener("click", () => this.csvFileInput.click());
+          this.csvDropzone.addEventListener("dragover", (e) => { e.preventDefault(); this.csvDropzone.classList.add("drag-over"); });
+          this.csvDropzone.addEventListener("dragleave", () => this.csvDropzone.classList.remove("drag-over"));
+          this.csvDropzone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            this.csvDropzone.classList.remove("drag-over");
+            if (e.dataTransfer.files.length > 0) this.handleCsvFile(e.dataTransfer.files[0]);
+          });
+        }
+        if (this.csvFileInput) {
+          this.csvFileInput.addEventListener("change", (e) => {
+            if (e.target.files.length > 0) this.handleCsvFile(e.target.files[0]);
+          });
+        }
+      }
+
+      switchGame(game) {
+        this.activeGame = game;
+        this.gameTabs.forEach(t => t.classList.toggle("active", t.dataset.game === game));
+        this.loadSampleData(game);
+      }
+
+      loadSampleData(game) {
+        if (game === "powerball") this.draws = [...SAMPLE_POWERBALL];
+        else if (game === "megamillions") this.draws = [...SAMPLE_MEGA_MILLIONS];
+        else if (game === "cash5") this.draws = [...SAMPLE_CASH_5];
+        this.manualLines = [];
+        this.activeDigitHighlight = null;
+        this.applyFilters();
+        this.showToast(`Loaded ${game.toUpperCase()} sample dataset.`);
+      }
+
+      applyFilters() {
+        let result = [...this.draws];
+        const startVal = this.startDateInput ? this.startDateInput.value : "";
+        const endVal = this.endDateInput ? this.endDateInput.value : "";
+        const sortOrder = this.sortOrderSelect ? this.sortOrderSelect.value : "desc";
+
+        if (startVal) result = result.filter(d => d.date >= startVal);
+        if (endVal) result = result.filter(d => d.date <= endVal);
+
+        result.sort((a, b) => {
+          const tA = new Date(a.date).getTime();
+          const tB = new Date(b.date).getTime();
+          return sortOrder === "desc" ? tB - tA : tA - tB;
+        });
+
+        this.filteredDraws = result;
+        this.updateState();
+      }
+
+      updateState() {
+        this.gridMatrix.setDraws(this.filteredDraws, this.activeGame);
+        this.updateLines();
+        this.updateStats();
+        this.saveToLocalStorage();
+      }
+
+      updateLines() {
+        this.autoLines = generateAutomatedPatterns(this.filteredDraws, this.patternSettings);
+        this.connectionEngine.setLines(this.manualLines, this.autoLines);
+      }
+
+      updateStats() {
+        if (!this.statsBar) return;
+        const counts = Array(10).fill(0);
+        this.filteredDraws.forEach(draw => {
+          draw.numbers.forEach(num => {
+            const formatted = num.toString().padStart(2, '0');
+            counts[parseInt(formatted[0], 10)]++;
+            counts[parseInt(formatted[1], 10)]++;
+          });
+          if (draw.bonus !== null && draw.bonus !== undefined) {
+            const formatted = draw.bonus.toString().padStart(2, '0');
+            counts[parseInt(formatted[0], 10)]++;
+            counts[parseInt(formatted[1], 10)]++;
+          }
+        });
+
+        const maxCount = Math.max(...counts, 1);
+        let html = '';
+        for (let d = 0; d <= 9; d++) {
+          const count = counts[d];
+          const percent = Math.round((count / maxCount) * 100);
+          html += `
+            <div class="heatmap-item" title="Digit ${d}: ${count} occurrences">
+              <div class="heatmap-digit">${d}</div>
+              <div class="heatmap-bar-container">
+                <div class="heatmap-bar-fill" style="height: ${percent}%;"></div>
+              </div>
+              <div class="heatmap-count">${count}</div>
+            </div>
+          `;
+        }
+        this.statsBar.innerHTML = html;
+      }
+
+      saveToLocalStorage() {
+        const projectData = { activeGame: this.activeGame, draws: this.draws, manualLines: this.manualLines };
+        localStorage.setItem("lottoplus_current_project", JSON.stringify(projectData));
+      }
+
+      loadFromLocalStorage() {
+        const raw = localStorage.getItem("lottoplus_current_project");
+        if (!raw) return;
+        try {
+          const data = JSON.parse(raw);
+          if (data.activeGame && data.draws) {
+            this.activeGame = data.activeGame;
+            this.draws = data.draws;
+            this.manualLines = data.manualLines || [];
+            this.gameTabs.forEach(t => t.classList.toggle("active", t.dataset.game === this.activeGame));
+          }
+        } catch (e) {}
+      }
+
+      exportProjectFile() {
+        const project = { appName: "LottoPlus", gameType: this.activeGame, draws: this.draws, manualLines: this.manualLines };
+        const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `lottoplus_${this.activeGame}_${new Date().toISOString().split('T')[0]}.lottoplus`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.showToast("Project file saved!");
+      }
+
+      importProjectFile(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const project = JSON.parse(evt.target.result);
+            if (project.draws && Array.isArray(project.draws)) {
+              this.draws = project.draws;
+              this.manualLines = project.manualLines || [];
+              if (project.gameType) {
+                this.activeGame = project.gameType;
+                this.gameTabs.forEach(t => t.classList.toggle("active", t.dataset.game === this.activeGame));
+              }
+              this.applyFilters();
+              this.showToast("Project loaded!");
+            }
+          } catch (err) { alert("Invalid project file."); }
+        };
+        reader.readAsText(file);
+        e.target.value = "";
+      }
+
+      handleCsvFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const { headers, rows } = parseCSV(e.target.result);
+          if (headers.length === 0 || rows.length === 0) return;
+          const mapping = autoMapColumns(headers);
+          const importedDraws = convertRowsToDraws(headers, rows, mapping, this.activeGame);
+          if (importedDraws.length > 0) {
+            this.draws = importedDraws;
+            this.manualLines = [];
+            this.applyFilters();
+            this.csvModal.classList.remove("active");
+            this.showToast(`Imported ${importedDraws.length} draws!`);
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      showToast(message) {
+        let container = document.querySelector(".toast-container");
+        if (!container) {
+          container = document.createElement("div");
+          container.className = "toast-container";
+          document.body.appendChild(container);
+        }
+        const toast = document.createElement("div");
+        toast.className = "toast";
+        toast.innerHTML = `<span>✨</span><span>${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+      }
+    }
+
+    window.app = new LottoPlusApp();
+  </script>
+</body>
+</html>
