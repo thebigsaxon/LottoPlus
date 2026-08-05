@@ -546,85 +546,7 @@
       color: var(--text-muted);
     }
 
-    /* Modals */
-    .modal-backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(8px);
-      z-index: 200;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-
-    .modal-backdrop.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal-card {
-      background: #121a2c;
-      border: 1px solid var(--border-highlight);
-      border-radius: 16px;
-      width: 100%;
-      max-width: 580px;
-      padding: 1.5rem;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .modal-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-    }
-
-    .close-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 1.2rem;
-      line-height: 1;
-    }
-
-    .close-btn:hover { color: white; }
-
-    /* Dropzone for CSV */
-    .dropzone {
-      border: 2px dashed rgba(255, 255, 255, 0.2);
-      border-radius: 12px;
-      padding: 2rem 1.5rem;
-      text-align: center;
-      background: rgba(255, 255, 255, 0.02);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .dropzone:hover, .dropzone.drag-over {
-      border-color: var(--accent-primary);
-      background: rgba(99, 102, 241, 0.08);
-    }
-
+    /* Form Controls */
     .form-group {
       display: flex;
       flex-direction: column;
@@ -697,31 +619,34 @@
 
     <!-- Game Selector Tabs -->
     <nav class="game-tabs">
-      <button class="tab-btn game-powerball active" data-game="powerball">
+      <button class="tab-btn game-cash5 active" data-game="cash5">
+        <span>🟢</span> Cash 5
+      </button>
+      <button class="tab-btn game-powerball" data-game="powerball">
         <span>🔴</span> Powerball
       </button>
       <button class="tab-btn game-megamillions" data-game="megamillions">
         <span>🟡</span> Mega Millions
       </button>
-      <button class="tab-btn game-cash5" data-game="cash5">
-        <span>🟢</span> Cash 5
-      </button>
     </nav>
 
     <!-- Global Actions -->
     <div class="header-actions">
-      <button class="btn" id="btnLoadSample" title="Load sample historical draws">
-        <span>🎲</span> Load Sample Data
+      <button class="btn" id="btnLoadSample" title="Reset sample dataset">
+        <span>🎲</span> Reset Data
       </button>
-      <button class="btn" id="btnImportCsv">
+      <button class="btn" id="btnImportCsv" title="Open Finder to select CSV file">
         <span>📥</span> Import CSV
       </button>
-      <button class="btn" id="btnOpenProject">
+      <button class="btn" id="btnOpenProject" title="Open saved project file">
         <span>📂</span> Open Project
       </button>
-      <button class="btn btn-primary" id="btnSaveProject">
+      <button class="btn btn-primary" id="btnSaveProject" title="Save workspace file">
         <span>💾</span> Save Project File
       </button>
+      
+      <!-- Native Finder File Inputs -->
+      <input type="file" id="csvFileInput" accept=".csv,.txt" style="display: none;">
       <input type="file" id="projectFileInput" accept=".lottoplus,.json" style="display: none;">
     </div>
   </header>
@@ -833,77 +758,47 @@
 
   </div>
 
-  <!-- CSV Import Modal -->
-  <div class="modal-backdrop" id="csvModal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 class="modal-title">Import CSV Draw Records</h3>
-        <button class="close-btn close-modal">&times;</button>
-      </div>
-      <div>
-        <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
-          Upload a CSV file containing lottery draw dates and numbers. LottoPlus automatically maps columns for Main Balls, Bonus/Powerball, and Draw Dates.
-        </p>
-        <div class="dropzone" id="csvDropzone">
-          <span style="font-size: 2rem;">📄</span>
-          <div>
-            <strong style="color: white;">Click to browse</strong> or drag & drop CSV file
-          </div>
-          <span style="font-size: 0.78rem; color: var(--text-muted);">Supports .csv files formatted as Date, Ball 1, Ball 2...</span>
-          <input type="file" id="csvFileInput" accept=".csv,.txt" style="display: none;">
-        </div>
-      </div>
-      <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
-        <button class="btn close-modal">Cancel</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Embedded Self-Contained JavaScript -->
   <script>
-    // Sample Datasets
+    // Real Cash 5 + Sample Powerball & Mega Millions
+    const SAMPLE_CASH_5 = [
+      { id: "c5-1", date: "2026-08-04", numbers: [1, 5, 6, 11, 39] },
+      { id: "c5-2", date: "2026-08-03", numbers: [11, 23, 25, 37, 42] },
+      { id: "c5-3", date: "2026-08-02", numbers: [1, 21, 22, 33, 35] },
+      { id: "c5-4", date: "2026-08-01", numbers: [2, 19, 27, 33, 42] },
+      { id: "c5-5", date: "2026-07-31", numbers: [7, 10, 12, 29, 42] },
+      { id: "c5-6", date: "2026-07-30", numbers: [3, 14, 19, 30, 41] },
+      { id: "c5-7", date: "2026-07-29", numbers: [3, 5, 7, 17, 37] },
+      { id: "c5-8", date: "2026-07-28", numbers: [6, 7, 12, 27, 41] },
+      { id: "c5-9", date: "2026-07-27", numbers: [4, 26, 32, 36, 42] },
+      { id: "c5-10", date: "2026-07-26", numbers: [3, 4, 22, 30, 34] },
+      { id: "c5-11", date: "2026-07-25", numbers: [3, 4, 23, 27, 34] },
+      { id: "c5-12", date: "2026-07-24", numbers: [4, 19, 26, 28, 34] },
+      { id: "c5-13", date: "2026-07-23", numbers: [5, 13, 20, 27, 36] },
+      { id: "c5-14", date: "2026-07-22", numbers: [1, 5, 12, 20, 35] },
+      { id: "c5-15", date: "2026-07-21", numbers: [4, 9, 15, 24, 31] },
+      { id: "c5-16", date: "2026-07-20", numbers: [15, 17, 34, 36, 42] },
+      { id: "c5-17", date: "2026-07-19", numbers: [14, 15, 26, 33, 36] },
+      { id: "c5-18", date: "2026-07-18", numbers: [10, 22, 24, 29, 32] },
+      { id: "c5-19", date: "2026-07-17", numbers: [7, 8, 11, 14, 42] },
+      { id: "c5-20", date: "2026-07-16", numbers: [6, 21, 24, 38, 40] }
+    ];
+
     const SAMPLE_POWERBALL = [
       { id: "pb-1", date: "2026-08-03", numbers: [3, 14, 28, 44, 59], bonus: 12, multiplier: 3 },
       { id: "pb-2", date: "2026-08-01", numbers: [7, 19, 32, 41, 68], bonus: 4, multiplier: 2 },
       { id: "pb-3", date: "2026-07-29", numbers: [1, 24, 32, 44, 60], bonus: 18, multiplier: 4 },
       { id: "pb-4", date: "2026-07-27", numbers: [12, 26, 35, 51, 62], bonus: 9, multiplier: 2 },
-      { id: "pb-5", date: "2026-07-25", numbers: [5, 18, 29, 44, 53], bonus: 24, multiplier: 3 },
-      { id: "pb-6", date: "2026-07-22", numbers: [8, 22, 34, 49, 65], bonus: 15, multiplier: 5 },
-      { id: "pb-7", date: "2026-07-20", numbers: [2, 14, 30, 42, 57], bonus: 7, multiplier: 2 },
-      { id: "pb-8", date: "2026-07-18", numbers: [9, 21, 38, 47, 61], bonus: 11, multiplier: 3 },
-      { id: "pb-9", date: "2026-07-15", numbers: [4, 16, 27, 40, 58], bonus: 22, multiplier: 2 },
-      { id: "pb-10", date: "2026-07-13", numbers: [11, 25, 33, 46, 69], bonus: 1, multiplier: 4 },
-      { id: "pb-11", date: "2026-07-11", numbers: [6, 17, 31, 48, 64], bonus: 19, multiplier: 3 },
-      { id: "pb-12", date: "2026-07-08", numbers: [15, 23, 36, 50, 67], bonus: 8, multiplier: 2 },
+      { id: "pb-5", date: "2026-07-25", numbers: [5, 18, 29, 44, 53], bonus: 24, multiplier: 3 }
     ];
 
     const SAMPLE_MEGA_MILLIONS = [
       { id: "mm-1", date: "2026-08-04", numbers: [10, 24, 38, 45, 62], bonus: 14, multiplier: 3 },
       { id: "mm-2", date: "2026-07-31", numbers: [4, 18, 29, 52, 69], bonus: 8, multiplier: 4 },
-      { id: "mm-3", date: "2026-07-28", numbers: [15, 27, 34, 48, 70], bonus: 21, multiplier: 2 },
-      { id: "mm-4", date: "2026-07-24", numbers: [2, 11, 36, 43, 58], bonus: 5, multiplier: 3 },
-      { id: "mm-5", date: "2026-07-21", numbers: [9, 20, 31, 49, 66], bonus: 17, multiplier: 5 },
-      { id: "mm-6", date: "2026-07-17", numbers: [6, 14, 25, 41, 63], bonus: 12, multiplier: 2 },
-      { id: "mm-7", date: "2026-07-14", numbers: [1, 23, 39, 50, 67], bonus: 25, multiplier: 3 },
-      { id: "mm-8", date: "2026-07-10", numbers: [13, 22, 35, 47, 61], bonus: 9, multiplier: 4 },
-      { id: "mm-9", date: "2026-07-07", numbers: [8, 19, 32, 44, 68], bonus: 3, multiplier: 2 },
-      { id: "mm-10", date: "2026-07-03", numbers: [5, 17, 28, 40, 59], bonus: 19, multiplier: 3 },
+      { id: "mm-3", date: "2026-07-28", numbers: [15, 27, 34, 48, 70], bonus: 21, multiplier: 2 }
     ];
 
-    const SAMPLE_CASH_5 = [
-      { id: "c5-1", date: "2026-08-03", numbers: [4, 12, 23, 31, 40] },
-      { id: "c5-2", date: "2026-08-02", numbers: [9, 18, 24, 35, 41] },
-      { id: "c5-3", date: "2026-08-01", numbers: [1, 14, 22, 33, 42] },
-      { id: "c5-4", date: "2026-07-31", numbers: [7, 15, 29, 36, 39] },
-      { id: "c5-5", date: "2026-07-30", numbers: [3, 11, 20, 30, 43] },
-      { id: "c5-6", date: "2026-07-29", numbers: [8, 16, 25, 34, 38] },
-      { id: "c5-7", date: "2026-07-28", numbers: [2, 19, 27, 32, 41] },
-      { id: "c5-8", date: "2026-07-27", numbers: [5, 13, 21, 37, 40] },
-      { id: "c5-9", date: "2026-07-26", numbers: [10, 17, 26, 31, 42] },
-      { id: "c5-10", date: "2026-07-25", numbers: [6, 14, 28, 35, 43] },
-    ];
-
-    // CSV Parser Utilities
+    // Robust CSV Parser
     function parseCSV(csvText) {
       const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
       if (lines.length === 0) return { headers: [], rows: [] };
@@ -918,7 +813,8 @@
         const matches = [];
         let match;
         while ((match = regex.exec(line)) !== null) {
-          matches.push((match[1] !== undefined ? match[1] : match[2]).trim());
+          const val = (match[1] !== undefined ? match[1] : match[2]).trim();
+          matches.push(val);
         }
         return matches;
       });
@@ -927,11 +823,13 @@
     }
 
     function autoMapColumns(headers) {
-      const mapping = { dateIndex: -1, ballIndices: [], bonusIndex: -1, multiplierIndex: -1 };
+      const mapping = { dateIndex: -1, winningNumbersIndex: -1, ballIndices: [], bonusIndex: -1, multiplierIndex: -1 };
       headers.forEach((h, idx) => {
         const lower = h.toLowerCase().replace(/[^a-z0-9]/g, '');
         if (lower.includes('date') || lower.includes('draw')) {
           if (mapping.dateIndex === -1) mapping.dateIndex = idx;
+        } else if (lower.includes('winning') || lower.includes('number') || lower.includes('combination')) {
+          if (mapping.winningNumbersIndex === -1) mapping.winningNumbersIndex = idx;
         } else if (lower.includes('powerball') || lower.includes('megaball') || lower.includes('bonus') || lower.includes('pb') || lower.includes('mb')) {
           if (mapping.bonusIndex === -1) mapping.bonusIndex = idx;
         } else if (lower.includes('multiplier') || lower.includes('powerplay') || lower.includes('megaplier')) {
@@ -940,7 +838,8 @@
           mapping.ballIndices.push(idx);
         }
       });
-      if (mapping.ballIndices.length === 0) {
+
+      if (mapping.winningNumbersIndex === -1 && mapping.ballIndices.length === 0) {
         headers.forEach((h, idx) => {
           if (idx !== mapping.dateIndex && idx !== mapping.bonusIndex && idx !== mapping.multiplierIndex) {
             mapping.ballIndices.push(idx);
@@ -956,16 +855,26 @@
         if (row.length <= 1) return;
         let rawDate = mapping.dateIndex >= 0 ? row[mapping.dateIndex] : new Date().toISOString().split('T')[0];
         let parsedDate = normalizeDate(rawDate);
-        let numbers = mapping.ballIndices.map(idx => parseInt(row[idx], 10)).filter(n => !isNaN(n));
+
+        let numbers = [];
+        if (mapping.winningNumbersIndex >= 0 && row[mapping.winningNumbersIndex]) {
+          const cellVal = row[mapping.winningNumbersIndex];
+          const matchedInts = cellVal.match(/\d+/g);
+          if (matchedInts) numbers = matchedInts.map(n => parseInt(n, 10));
+        } else if (mapping.ballIndices.length > 0) {
+          numbers = mapping.ballIndices.map(idx => parseInt(row[idx], 10)).filter(n => !isNaN(n));
+        }
+
+        if (numbers.length === 0) return;
+
         numbers.sort((a, b) => a - b);
         let bonus = mapping.bonusIndex >= 0 ? parseInt(row[mapping.bonusIndex], 10) : null;
         if (isNaN(bonus)) bonus = null;
         let multiplier = mapping.multiplierIndex >= 0 ? parseInt(row[mapping.multiplierIndex], 10) : null;
 
-        if (numbers.length > 0) {
-          draws.push({ id: `csv-${Date.now()}-${i}`, date: parsedDate, numbers, bonus, multiplier });
-        }
+        draws.push({ id: `csv-${Date.now()}-${i}`, date: parsedDate, numbers, bonus, multiplier });
       });
+
       draws.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       return draws;
     }
@@ -982,7 +891,7 @@
       return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : clean;
     }
 
-    // Pattern Detection Engine
+    // Pattern Engine
     function generateAutomatedPatterns(draws, settings = {}) {
       const { showMatches = true, showVerticalRuns = false, showDiagonalRuns = false, colorMatch = "#06b6d4", colorRun = "#ec4899" } = settings;
       const lines = [];
@@ -1208,7 +1117,7 @@
       constructor(container) {
         this.container = container;
         this.draws = [];
-        this.gameType = "powerball";
+        this.gameType = "cash5";
         this.highlightedDigit = null;
         this.onCellClickCallback = null;
       }
@@ -1303,8 +1212,8 @@
     // App Orchestrator
     class LottoPlusApp {
       constructor() {
-        this.activeGame = "powerball";
-        this.draws = [...SAMPLE_POWERBALL];
+        this.activeGame = "cash5";
+        this.draws = [...SAMPLE_CASH_5];
         this.filteredDraws = [...this.draws];
         this.manualLines = [];
         this.autoLines = [];
@@ -1330,11 +1239,9 @@
         this.chkMatches = document.getElementById("chkMatches");
         this.chkVerticalRuns = document.getElementById("chkVerticalRuns");
         this.chkDiagonalRuns = document.getElementById("chkDiagonalRuns");
-        this.csvModal = document.getElementById("csvModal");
         this.csvFileInput = document.getElementById("csvFileInput");
-        this.csvDropzone = document.getElementById("csvDropzone");
-        this.statsBar = document.getElementById("statsBar");
         this.projectFileInput = document.getElementById("projectFileInput");
+        this.statsBar = document.getElementById("statsBar");
 
         this.gridMatrix = new GridMatrix(this.gridContainer);
         this.connectionEngine = new ConnectionEngine(this.svgOverlay, this.gridContainer);
@@ -1397,22 +1304,14 @@
         if (this.btnOpenProject) this.btnOpenProject.addEventListener("click", () => this.projectFileInput.click());
         if (this.projectFileInput) this.projectFileInput.addEventListener("change", (e) => this.importProjectFile(e));
 
-        if (this.btnImportCsv) this.btnImportCsv.addEventListener("click", () => this.csvModal.classList.add("active"));
-        document.querySelectorAll(".close-modal").forEach(btn => btn.addEventListener("click", () => this.csvModal.classList.remove("active")));
-
-        if (this.csvDropzone) {
-          this.csvDropzone.addEventListener("click", () => this.csvFileInput.click());
-          this.csvDropzone.addEventListener("dragover", (e) => { e.preventDefault(); this.csvDropzone.classList.add("drag-over"); });
-          this.csvDropzone.addEventListener("dragleave", () => this.csvDropzone.classList.remove("drag-over"));
-          this.csvDropzone.addEventListener("drop", (e) => {
-            e.preventDefault();
-            this.csvDropzone.classList.remove("drag-over");
-            if (e.dataTransfer.files.length > 0) this.handleCsvFile(e.dataTransfer.files[0]);
-          });
-        }
+        // Direct Finder open picker
+        if (this.btnImportCsv) this.btnImportCsv.addEventListener("click", () => this.csvFileInput.click());
         if (this.csvFileInput) {
           this.csvFileInput.addEventListener("change", (e) => {
-            if (e.target.files.length > 0) this.handleCsvFile(e.target.files[0]);
+            if (e.target.files.length > 0) {
+              this.handleCsvFile(e.target.files[0]);
+              e.target.value = "";
+            }
           });
         }
       }
@@ -1430,7 +1329,7 @@
         this.manualLines = [];
         this.activeDigitHighlight = null;
         this.applyFilters();
-        this.showToast(`Loaded ${game.toUpperCase()} sample dataset.`);
+        this.showToast(`Loaded ${game.toUpperCase()} data.`);
       }
 
       applyFilters() {
@@ -1563,8 +1462,9 @@
             this.draws = importedDraws;
             this.manualLines = [];
             this.applyFilters();
-            this.csvModal.classList.remove("active");
-            this.showToast(`Imported ${importedDraws.length} draws!`);
+            this.showToast(`Imported ${importedDraws.length} draws from Finder!`);
+          } else {
+            alert("Could not extract numbers from CSV file.");
           }
         };
         reader.readAsText(file);

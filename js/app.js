@@ -10,8 +10,8 @@ import { GridMatrix } from './gridMatrix.js';
 
 class LottoPlusApp {
   constructor() {
-    this.activeGame = "powerball"; // 'powerball', 'megamillions', 'cash5'
-    this.draws = [...SAMPLE_POWERBALL];
+    this.activeGame = "cash5"; // Default to Cash 5 with user sample data
+    this.draws = [...SAMPLE_CASH_5];
     this.filteredDraws = [...this.draws];
     this.manualLines = [];
     this.autoLines = [];
@@ -66,16 +66,12 @@ class LottoPlusApp {
     this.chkVerticalRuns = document.getElementById("chkVerticalRuns");
     this.chkDiagonalRuns = document.getElementById("chkDiagonalRuns");
 
-    // CSV Modal
-    this.csvModal = document.getElementById("csvModal");
+    // Hidden File Inputs
     this.csvFileInput = document.getElementById("csvFileInput");
-    this.csvDropzone = document.getElementById("csvDropzone");
+    this.projectFileInput = document.getElementById("projectFileInput");
 
     // Stats bar
     this.statsBar = document.getElementById("statsBar");
-
-    // Project File Input
-    this.projectFileInput = document.getElementById("projectFileInput");
   }
 
   setupComponents() {
@@ -84,7 +80,6 @@ class LottoPlusApp {
 
     this.gridMatrix.onCellClickCallback = (cellElement, cellId, digit) => {
       if (this.connectionEngine.activeTool === "select") {
-        // Highlight all instances of this digit in grid
         if (this.activeDigitHighlight === digit) {
           this.activeDigitHighlight = null;
         } else {
@@ -180,34 +175,15 @@ class LottoPlusApp {
       this.projectFileInput.addEventListener("change", (e) => this.importProjectFile(e));
     }
 
-    // CSV Modal Handlers
+    // Direct Finder File Picker for CSV Import
     if (this.btnImportCsv) {
-      this.btnImportCsv.addEventListener("click", () => this.openCsvModal());
-    }
-    document.querySelectorAll(".close-modal").forEach(btn => {
-      btn.addEventListener("click", () => this.closeCsvModal());
-    });
-    if (this.csvDropzone) {
-      this.csvDropzone.addEventListener("click", () => this.csvFileInput.click());
-      this.csvDropzone.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        this.csvDropzone.classList.add("drag-over");
-      });
-      this.csvDropzone.addEventListener("dragleave", () => {
-        this.csvDropzone.classList.remove("drag-over");
-      });
-      this.csvDropzone.addEventListener("drop", (e) => {
-        e.preventDefault();
-        this.csvDropzone.classList.remove("drag-over");
-        if (e.dataTransfer.files.length > 0) {
-          this.handleCsvFile(e.dataTransfer.files[0]);
-        }
-      });
+      this.btnImportCsv.addEventListener("click", () => this.csvFileInput.click());
     }
     if (this.csvFileInput) {
       this.csvFileInput.addEventListener("change", (e) => {
         if (e.target.files.length > 0) {
           this.handleCsvFile(e.target.files[0]);
+          e.target.value = ""; // Reset for re-selection
         }
       });
     }
@@ -272,22 +248,18 @@ class LottoPlusApp {
   updateStats() {
     if (!this.statsBar) return;
 
-    // Calculate digit frequencies (0 through 9)
     const counts = Array(10).fill(0);
-    let totalDigits = 0;
 
     this.filteredDraws.forEach(draw => {
       draw.numbers.forEach(num => {
         const formatted = num.toString().padStart(2, '0');
         counts[parseInt(formatted[0], 10)]++;
         counts[parseInt(formatted[1], 10)]++;
-        totalDigits += 2;
       });
       if (draw.bonus !== null && draw.bonus !== undefined) {
         const formatted = draw.bonus.toString().padStart(2, '0');
         counts[parseInt(formatted[0], 10)]++;
         counts[parseInt(formatted[1], 10)]++;
-        totalDigits += 2;
       }
     });
 
@@ -312,7 +284,6 @@ class LottoPlusApp {
     this.statsBar.innerHTML = html;
   }
 
-  // Local Storage Save/Load
   saveToLocalStorage() {
     const projectData = {
       activeGame: this.activeGame,
@@ -340,7 +311,6 @@ class LottoPlusApp {
     }
   }
 
-  // Export Local Project File (.lottoplus JSON)
   exportProjectFile() {
     const project = {
       appName: "LottoPlus",
@@ -360,10 +330,9 @@ class LottoPlusApp {
     a.click();
     URL.revokeObjectURL(url);
 
-    this.showToast("Project file downloaded locally!");
+    this.showToast("Project file saved!");
   }
 
-  // Import Local Project File (.lottoplus JSON)
   importProjectFile(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -380,7 +349,7 @@ class LottoPlusApp {
             this.gameTabs.forEach(t => t.classList.toggle("active", t.dataset.game === this.activeGame));
           }
           this.applyFilters();
-          this.showToast("Project file successfully loaded!");
+          this.showToast("Project file loaded!");
         } else {
           alert("Invalid project file format.");
         }
@@ -390,15 +359,6 @@ class LottoPlusApp {
     };
     reader.readAsText(file);
     e.target.value = "";
-  }
-
-  // CSV Modal & Importer
-  openCsvModal() {
-    this.csvModal.classList.add("active");
-  }
-
-  closeCsvModal() {
-    this.csvModal.classList.remove("active");
   }
 
   handleCsvFile(file) {
@@ -419,7 +379,6 @@ class LottoPlusApp {
         this.draws = importedDraws;
         this.manualLines = [];
         this.applyFilters();
-        this.closeCsvModal();
         this.showToast(`Successfully imported ${importedDraws.length} draws from CSV!`);
       } else {
         alert("Could not extract lottery numbers from CSV file.");

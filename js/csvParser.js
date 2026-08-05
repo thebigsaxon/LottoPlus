@@ -6,32 +6,30 @@ export function parseCSV(csvText) {
   const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length === 0) return { headers: [], rows: [] };
 
-  // Determine separator (comma, semicolon, tab)
   const firstLine = lines[0];
   let sep = ',';
   if (firstLine.includes('\t')) sep = '\t';
   else if (firstLine.includes(';')) sep = ';';
 
   const rows = lines.map(line => {
-    // Basic CSV splitting handling quotes
+    // Regex matching CSV values handling quotes
     const regex = new RegExp(`(?:^|${sep})(?:"([^"]*)"|([^"${sep}]*))`, 'g');
     const matches = [];
     let match;
     while ((match = regex.exec(line)) !== null) {
-      matches.push((match[1] !== undefined ? match[1] : match[2]).trim());
+      const val = (match[1] !== undefined ? match[1] : match[2]).trim();
+      matches.push(val);
     }
     return matches;
   });
 
-  const headers = rows[0];
-  const dataRows = rows.slice(1);
-
-  return { headers, rows: dataRows };
+  return { headers: rows[0], rows: rows.slice(1) };
 }
 
 export function autoMapColumns(headers) {
   const mapping = {
     dateIndex: -1,
+    winningNumbersIndex: -1,
     ballIndices: [],
     bonusIndex: -1,
     multiplierIndex: -1
@@ -41,6 +39,8 @@ export function autoMapColumns(headers) {
     const lower = h.toLowerCase().replace(/[^a-z0-9]/g, '');
     if (lower.includes('date') || lower.includes('draw')) {
       if (mapping.dateIndex === -1) mapping.dateIndex = idx;
+    } else if (lower.includes('winning') || lower.includes('number') || lower.includes('combination')) {
+      if (mapping.winningNumbersIndex === -1) mapping.winningNumbersIndex = idx;
     } else if (lower.includes('powerball') || lower.includes('megaball') || lower.includes('bonus') || lower.includes('pb') || lower.includes('mb')) {
       if (mapping.bonusIndex === -1) mapping.bonusIndex = idx;
     } else if (lower.includes('multiplier') || lower.includes('powerplay') || lower.includes('megaplier')) {
@@ -50,8 +50,7 @@ export function autoMapColumns(headers) {
     }
   });
 
-  // If ball indices not found explicitly, assume remaining numeric columns
-  if (mapping.ballIndices.length === 0) {
+  if (mapping.winningNumbersIndex === -1 && mapping.ballIndices.length === 0) {
     headers.forEach((h, idx) => {
       if (idx !== mapping.dateIndex && idx !== mapping.bonusIndex && idx !== mapping.multiplierIndex) {
         mapping.ballIndices.push(idx);
@@ -71,25 +70,39 @@ export function convertRowsToDraws(headers, dataRows, mapping, gameType) {
     let rawDate = mapping.dateIndex >= 0 ? row[mapping.dateIndex] : new Date().toISOString().split('T')[0];
     let parsedDate = normalizeDate(rawDate);
 
-    let numbers = mapping.ballIndices.map(idx => parseInt(row[idx], 10)).filter(n => !isNaN(n));
-    
-    // Sort main numbers ascending
-    numbers.sort((a, b) => a - b);
+    let numbers = [];
 
+    // Case 1: Hyphen or space separated numbers in a single column (e.g. " 1 - 5 - 6 - 11 - 39 ")
+    if (mapping.winningNumbersIndex >= 0 && row[mapping.winningNumbersIndex]) {
+      const cellVal = row[mapping.winningNumbersIndex];
+      // Extract all integers from string
+      const matchedInts = cellVal.match(/\d+/g);
+      if (matchedInts) {
+        numbers = matchedInts.map(n => parseInt(n, 10));
+      }
+    } else if (mapping.ballIndices.length > 0) {
+      // Case 2: Individual ball columns
+      numbers = mapping.ballIndices.map(idx => parseInt(row[idx], 10)).filter(n => !isNaN(n));
+    }
+
+    if (numbers.length === 0) return;
+
+    // Check if bonus ball is separate or part of numbers array
     let bonus = mapping.bonusIndex >= 0 ? parseInt(row[mapping.bonusIndex], 10) : null;
     if (isNaN(bonus)) bonus = null;
 
+    // Sort main numbers ascending
+    numbers.sort((a, b) => a - b);
+
     let multiplier = mapping.multiplierIndex >= 0 ? parseInt(row[mapping.multiplierIndex], 10) : null;
 
-    if (numbers.length > 0) {
-      draws.push({
-        id: `csv-${Date.now()}-${i}`,
-        date: parsedDate,
-        numbers,
-        bonus,
-        multiplier
-      });
-    }
+    draws.push({
+      id: `csv-${Date.now()}-${i}`,
+      date: parsedDate,
+      numbers,
+      bonus,
+      multiplier
+    });
   });
 
   // Sort by date descending
@@ -104,7 +117,7 @@ function normalizeDate(dateStr) {
   // YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
 
-  // MM/DD/YYYY
+  // M/D/YYYY or MM/DD/YYYY
   const mdy = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (mdy) {
     const m = mdy[1].padStart(2, '0');
@@ -112,7 +125,6 @@ function normalizeDate(dateStr) {
     return `${mdy[3]}-${m}-${d}`;
   }
 
-  // Fallback date parser
   const d = new Date(clean);
   if (!isNaN(d.getTime())) {
     return d.toISOString().split('T')[0];

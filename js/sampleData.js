@@ -12,9 +12,7 @@ export const SAMPLE_POWERBALL = [
   { id: "pb-7", date: "2026-07-20", numbers: [2, 14, 30, 42, 57], bonus: 7, multiplier: 2 },
   { id: "pb-8", date: "2026-07-18", numbers: [9, 21, 38, 47, 61], bonus: 11, multiplier: 3 },
   { id: "pb-9", date: "2026-07-15", numbers: [4, 16, 27, 40, 58], bonus: 22, multiplier: 2 },
-  { id: "pb-10", date: "2026-07-13", numbers: [11, 25, 33, 46, 69], bonus: 1, multiplier: 4 },
-  { id: "pb-11", date: "2026-07-11", numbers: [6, 17, 31, 48, 64], bonus: 19, multiplier: 3 },
-  { id: "pb-12", date: "2026-07-08", numbers: [15, 23, 36, 50, 67], bonus: 8, multiplier: 2 },
+  { id: "pb-10", date: "2026-07-13", numbers: [11, 25, 33, 46, 69], bonus: 1, multiplier: 4 }
 ];
 
 export const SAMPLE_MEGA_MILLIONS = [
@@ -25,20 +23,28 @@ export const SAMPLE_MEGA_MILLIONS = [
   { id: "mm-5", date: "2026-07-21", numbers: [9, 20, 31, 49, 66], bonus: 17, multiplier: 5 },
   { id: "mm-6", date: "2026-07-17", numbers: [6, 14, 25, 41, 63], bonus: 12, multiplier: 2 },
   { id: "mm-7", date: "2026-07-14", numbers: [1, 23, 39, 50, 67], bonus: 25, multiplier: 3 },
-  { id: "mm-8", date: "2026-07-10", numbers: [13, 22, 35, 47, 61], bonus: 9, multiplier: 4 },
-  { id: "mm-9", date: "2026-07-07", numbers: [8, 19, 32, 44, 68], bonus: 3, multiplier: 2 },
-  { id: "mm-10", date: "2026-07-03", numbers: [5, 17, 28, 40, 59], bonus: 19, multiplier: 3 },
+  { id: "mm-8", date: "2026-07-10", numbers: [13, 22, 35, 47, 61], bonus: 9, multiplier: 4 }
 ];
 
 export const SAMPLE_CASH_5 = [
-  { id: "c5-1", date: "2026-08-03", numbers: [4, 12, 23, 31, 40] },
-  { id: "c5-2", date: "2026-08-02", numbers: [9, 18, 24, 35, 41] },
-  { id: "c5-3", date: "2026-08-01", numbers: [1, 14, 22, 33, 42] },
-  { id: "c5-4", date: "2026-07-31", numbers: [7, 15, 29, 36, 39] },
-  { id: "c5-5", date: "2026-07-30", numbers: [3, 11, 20, 30, 43] },
-  { id: "c5-6", date: "2026-07-29", numbers: [8, 16, 25, 34, 38] },
-  { id: "c5-7", date: "2026-07-28", numbers: [2, 19, 27, 32, 41] },
-  { id: "c5-8", date: "2026-07-27", numbers: [5, 13, 21, 37, 40] },
-  { id: "c5-9", date: "2026-07-26", numbers: [10, 17, 26, 31, 42] },
-  { id: "c5-10", date: "2026-07-25", numbers: [6, 14, 28, 35, 43] },
+  { id: "c5-1", date: "2026-08-04", numbers: [1, 5, 6, 11, 39] },
+  { id: "c5-2", date: "2026-08-03", numbers: [11, 23, 25, 37, 42] },
+  { id: "c5-3", date: "2026-08-02", numbers: [1, 21, 22, 33, 35] },
+  { id: "c5-4", date: "2026-08-01", numbers: [2, 19, 27, 33, 42] },
+  { id: "c5-5", date: "2026-07-31", numbers: [7, 10, 12, 29, 42] },
+  { id: "c5-6", date: "2026-07-30", numbers: [3, 14, 19, 30, 41] },
+  { id: "c5-7", date: "2026-07-29", numbers: [3, 5, 7, 17, 37] },
+  { id: "c5-8", date: "2026-07-28", numbers: [6, 7, 12, 27, 41] },
+  { id: "c5-9", date: "2026-07-27", numbers: [4, 26, 32, 36, 42] },
+  { id: "c5-10", date: "2026-07-26", numbers: [3, 4, 22, 30, 34] },
+  { id: "c5-11", date: "2026-07-25", numbers: [3, 4, 23, 27, 34] },
+  { id: "c5-12", date: "2026-07-24", numbers: [4, 19, 26, 28, 34] },
+  { id: "c5-13", date: "2026-07-23", numbers: [5, 13, 20, 27, 36] },
+  { id: "c5-14", date: "2026-07-22", numbers: [1, 5, 12, 20, 35] },
+  { id: "c5-15", date: "2026-07-21", numbers: [4, 9, 15, 24, 31] },
+  { id: "c5-16", date: "2026-07-20", numbers: [15, 17, 34, 36, 42] },
+  { id: "c5-17", date: "2026-07-19", numbers: [14, 15, 26, 33, 36] },
+  { id: "c5-18", date: "2026-07-18", numbers: [10, 22, 24, 29, 32] },
+  { id: "c5-19", date: "2026-07-17", numbers: [7, 8, 11, 14, 42] },
+  { id: "c5-20", date: "2026-07-16", numbers: [6, 21, 24, 38, 40] }
 ];
