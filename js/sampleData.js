@@ -1,4 +1,4 @@
-/** Built-in SC Palmetto Cash 5 sample drawings. */
+/** Built-in offline examples for the two PA games. */
 export const SAMPLE_CASH_5 = [
   { id: "c5-1", date: "2026-08-04", numbers: [1, 5, 6, 11, 39] },
   { id: "c5-2", date: "2026-08-03", numbers: [11, 23, 25, 37, 42] },
@@ -36,3 +36,31 @@ export const SAMPLE_CASH_5 = [
   { id: "c5-34", date: "2026-07-02", numbers: [2, 6, 7, 13, 15] },
   { id: "c5-35", date: "2026-07-01", numbers: [2, 22, 31, 37, 42] }
 ];
+
+export const SAMPLE_TREASURE_HUNT = [
+  { id: 'th-1', date: '2026-08-22', numbers: [7, 16, 21, 25, 30] },
+  { id: 'th-2', date: '2026-08-21', numbers: [1, 3, 8, 17, 18] },
+  { id: 'th-3', date: '2026-08-20', numbers: [1, 8, 10, 13, 20] },
+  { id: 'th-4', date: '2026-08-19', numbers: [2, 7, 11, 16, 26] },
+  { id: 'th-5', date: '2026-08-18', numbers: [4, 12, 19, 23, 27] },
+  { id: 'th-6', date: '2026-08-17', numbers: [1, 7, 9, 12, 29] },
+  { id: 'th-7', date: '2026-08-16', numbers: [3, 9, 20, 25, 26] },
+  { id: 'th-8', date: '2026-08-15', numbers: [4, 11, 23, 26, 29] },
+  { id: 'th-9', date: '2026-08-14', numbers: [2, 7, 13, 20, 24] },
+  { id: 'th-10', date: '2026-08-13', numbers: [6, 9, 12, 14, 21] },
+  { id: 'th-11', date: '2026-08-12', numbers: [8, 19, 21, 24, 25] },
+  { id: 'th-12', date: '2026-08-11', numbers: [2, 11, 16, 18, 25] },
+  { id: 'th-13', date: '2026-08-10', numbers: [6, 11, 14, 20, 29] },
+  { id: 'th-14', date: '2026-08-09', numbers: [12, 16, 17, 23, 27] },
+  { id: 'th-15', date: '2026-08-08', numbers: [4, 13, 19, 22, 28] },
+  { id: 'th-16', date: '2026-08-07', numbers: [4, 9, 10, 12, 21] },
+  { id: 'th-17', date: '2026-08-06', numbers: [1, 6, 20, 22, 26] },
+  { id: 'th-18', date: '2026-08-05', numbers: [5, 10, 15, 17, 30] },
+  { id: 'th-19', date: '2026-08-04', numbers: [4, 13, 17, 18, 23] },
+  { id: 'th-20', date: '2026-08-03', numbers: [1, 5, 7, 9, 18] }
+];
+
+export const SAMPLE_DRAWS_BY_GAME = Object.freeze({
+  cash5: SAMPLE_CASH_5,
+  treasureHunt: SAMPLE_TREASURE_HUNT
+});

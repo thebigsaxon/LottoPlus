@@ -1,12 +1,13 @@
-/** Main Cash 5 Studio application orchestrator. */
+/** Main PA 5 Studio application orchestrator. */
 
-import { SAMPLE_CASH_5 } from './sampleData.js?v=3';
+import { SAMPLE_DRAWS_BY_GAME } from './sampleData.js?v=4';
+import { DEFAULT_GAME_ID, GAME_IDS, getGameConfig, numberRange } from './gameConfig.js';
 import { parseCSV, autoMapColumns, convertRowsToDraws } from './csvParser.js';
 import { generateAutomatedPatterns } from './patternEngine.js';
 import { ConnectionEngine, normalizeManualConnectionChains } from './connectionEngine.js?v=5';
 import { GridMatrix } from './gridMatrix.js?v=5';
-import { fetchLiveCash5Update } from './liveFetcher.js?v=4';
-import { validateProject, validateDraw, escapeHTML } from './validation.js?v=3';
+import { fetchLiveGameUpdate } from './liveFetcher.js?v=5';
+import { validateProject, escapeHTML } from './validation.js?v=4';
 import { cash5AnalysisWindow, cash5ResearchWindow } from './drawFilters.js?v=2';
 import { findBoardSimilarSequences } from './motifEngine.js?v=4';
 import { buildNumberEvidence } from './evidenceEngine.js';
@@ -14,12 +15,12 @@ import { classifyOnesHeat } from './onesAnalysis.js';
 import { createDraftRow, editSessionInBuilder, finalizeSession, formatSessionForMessage, scorePendingSessions } from './sessionStore.js?v=5';
 import { futureCellEvidence, selectFutureDigit } from './futureWorkspace.js?v=2';
 import { buildDigitRepeatSummary } from './repeatSummary.js';
-import { recommendTensBands, TENS_BANDS, tensDigitForNumber } from './fuzzyTens.js';
+import { getTensBands, recommendTensBands, tensDigitForNumber } from './fuzzyTens.js';
 
 const INTERFACE_ZOOM_STEPS = [0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
-const INTERFACE_ZOOM_KEY = 'cash5studio_interface_zoom';
-const THEME_KEY = 'cash5studio_theme';
-const JACKPOT_KEY = 'cash5studio_last_jackpot';
+const INTERFACE_ZOOM_KEY = 'pa5studio_interface_zoom';
+const THEME_KEY = 'pa5studio_theme';
+const PROJECT_STORAGE_KEY = 'pa5studio_current_project_v4';
 
 function cash5NumberMarkup(number) {
   if (number === null || number === undefined || !Number.isInteger(Number(number))) return '<span class="number-empty">?</span>';
@@ -29,7 +30,11 @@ function cash5NumberMarkup(number) {
   return `<span class="number-leading">${leading}</span><strong class="number-ones">${ones}</strong>`;
 }
 
-function createWorkspaceState() {
+function emptyBallSlots(game = DEFAULT_GAME_ID) {
+  return Array.from({ length: getGameConfig(game).ballCount }, () => null);
+}
+
+export function createWorkspaceState(game = DEFAULT_GAME_ID) {
   return {
     motifSelections: [],
     motifMatches: [],
@@ -39,24 +44,37 @@ function createWorkspaceState() {
     selectedEvidenceDigit: null,
     fullCandidates: [],
     rowBuilder: [],
-    slipNumbers: [null, null, null, null, null],
-    slipTensFilters: [null, null, null, null, null],
+    slipNumbers: emptyBallSlots(game),
+    slipTensFilters: emptyBallSlots(game),
     draftRows: [],
     sessions: []
   };
 }
 
-export class Cash5StudioApp {
+function createGameState(gameId) {
+  return {
+    draws: [...SAMPLE_DRAWS_BY_GAME[gameId]],
+    manualLines: [],
+    workspace: createWorkspaceState(gameId),
+    jackpot: null,
+    jackpotIsStale: true
+  };
+}
+
+export class PA5StudioApp {
   constructor() {
-    this.draws = [...SAMPLE_CASH_5];
+    this.activeGameId = DEFAULT_GAME_ID;
+    this.gameStates = Object.fromEntries(GAME_IDS.map(gameId => [gameId, createGameState(gameId)]));
+    this.gameConfig = getGameConfig(this.activeGameId);
+    this.draws = this.gameStates[this.activeGameId].draws;
     this.filteredDraws = [...this.draws];
     this.researchDraws = cash5ResearchWindow(this.draws);
-    this.manualLines = [];
+    this.manualLines = this.gameStates[this.activeGameId].manualLines;
     this.autoLines = [];
     this.activeDigitHighlight = null;
     this.recentFinalizedSessionId = null;
-    this.jackpot = null;
-    this.jackpotIsStale = true;
+    this.jackpot = this.gameStates[this.activeGameId].jackpot;
+    this.jackpotIsStale = this.gameStates[this.activeGameId].jackpotIsStale;
 
     this.patternSettings = {
       showMatches: false,
@@ -70,7 +88,7 @@ export class Cash5StudioApp {
 
     this.gridMatrix = null;
     this.connectionEngine = null;
-    this.workspace = createWorkspaceState();
+    this.workspace = this.gameStates[this.activeGameId].workspace;
 
     this.init();
   }
@@ -82,8 +100,8 @@ export class Cash5StudioApp {
       this.loadInterfaceZoom();
       this.setupComponents();
       this.bindEvents();
-      this.loadCachedJackpot();
       this.loadFromLocalStorage();
+      this.applyGameLabels();
       this.applyFilters();
     });
   }
@@ -159,6 +177,9 @@ export class Cash5StudioApp {
     this.btnZoomIn = document.getElementById("btnZoomIn");
     this.zoomLevel = document.getElementById("zoomLevel");
     this.btnTheme = document.getElementById("btnTheme");
+    this.gameSwitch = document.getElementById("gameSwitch");
+    this.activeGameName = document.getElementById("activeGameName");
+    this.workspaceLabel = document.getElementById("workspaceLabel");
   }
 
   loadTheme() {
@@ -181,7 +202,6 @@ export class Cash5StudioApp {
     this.btnTheme?.setAttribute('aria-label', nextLabel);
     this.btnTheme?.setAttribute('title', nextLabel);
     this.btnTheme?.setAttribute('aria-pressed', String(nextTheme === 'dark'));
-    window.cash5StudioNativeTheme?.(nextTheme);
     if (persist) {
       try { localStorage.setItem(THEME_KEY, nextTheme); } catch (_) { /* no-op */ }
     }
@@ -192,25 +212,57 @@ export class Cash5StudioApp {
     this.setTheme(this.theme === 'dark' ? 'light' : 'dark');
   }
 
-  loadCachedJackpot() {
-    try {
-      const cached = JSON.parse(localStorage.getItem(JACKPOT_KEY) || 'null');
-      if (cached && Number.isSafeInteger(cached.amount) && cached.amount > 0 && typeof cached.fetchedAt === 'string') {
-        this.jackpot = {
-          amount: cached.amount,
-          display: `$${cached.amount.toLocaleString('en-US')}`,
-          fetchedAt: cached.fetchedAt,
-          source: String(cached.source || '')
-        };
-        this.jackpotIsStale = true;
-      }
-    } catch (_) {
-      this.jackpot = null;
-    }
+  cacheJackpot(jackpot) {
+    this.jackpot = jackpot;
+    this.gameStates[this.activeGameId].jackpot = jackpot;
+    this.gameStates[this.activeGameId].jackpotIsStale = this.jackpotIsStale;
   }
 
-  cacheJackpot(jackpot) {
-    try { localStorage.setItem(JACKPOT_KEY, JSON.stringify(jackpot)); } catch (_) { /* no-op */ }
+  commitActiveGameState() {
+    this.gameStates[this.activeGameId] = {
+      draws: this.draws,
+      manualLines: this.manualLines,
+      workspace: this.workspace,
+      jackpot: this.jackpot,
+      jackpotIsStale: this.jackpotIsStale
+    };
+  }
+
+  loadActiveGameState(gameId) {
+    this.activeGameId = getGameConfig(gameId).id;
+    this.gameConfig = getGameConfig(this.activeGameId);
+    const state = this.gameStates[this.activeGameId] || createGameState(this.activeGameId);
+    this.gameStates[this.activeGameId] = state;
+    this.draws = state.draws;
+    this.manualLines = state.manualLines;
+    this.workspace = state.workspace;
+    this.jackpot = state.jackpot;
+    this.jackpotIsStale = state.jackpotIsStale;
+  }
+
+  switchGame(gameId) {
+    const nextId = getGameConfig(gameId).id;
+    if (nextId === this.activeGameId) return;
+    this.commitActiveGameState();
+    this.connectionEngine?.completeConnection();
+    this.activeDigitHighlight = null;
+    this.recentFinalizedSessionId = null;
+    this.loadActiveGameState(nextId);
+    this.applyGameLabels();
+    this.applyFilters();
+    this.saveToLocalStorage();
+    this.showToast(`Switched to ${this.gameConfig.displayName}.`);
+  }
+
+  applyGameLabels() {
+    if (this.activeGameName) this.activeGameName.textContent = this.gameConfig.displayName;
+    if (this.workspaceLabel) this.workspaceLabel.setAttribute('aria-label', `${this.gameConfig.displayName} analysis workspace`);
+    document.title = `PA 5 Studio — ${this.gameConfig.displayName}`;
+    this.gameSwitch?.querySelectorAll('[data-game-id]').forEach(button => {
+      const active = button.dataset.gameId === this.activeGameId;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
   }
 
   loadInterfaceZoom() {
@@ -286,6 +338,17 @@ export class Cash5StudioApp {
   }
 
   bindEvents() {
+    this.gameSwitch?.querySelectorAll('[data-game-id]').forEach(button => {
+      button.addEventListener('click', () => this.switchGame(button.dataset.gameId));
+    });
+    window.pa5Desktop?.onMenuAction?.(action => {
+      if (action === 'importCSV') this.csvFileInput?.click();
+      else if (action === 'openProject') this.projectFileInput?.click();
+      else if (action === 'saveProject') this.exportProjectFile();
+      else if (action === 'zoomIn') this.zoomInterface(1);
+      else if (action === 'zoomOut') this.zoomInterface(-1);
+      else if (action === 'zoomReset') this.setInterfaceZoom(1);
+    });
     if (this.toolBtns) {
       this.toolBtns.forEach(btn => {
         btn.addEventListener("click", () => {
@@ -393,8 +456,8 @@ export class Cash5StudioApp {
     this.btnTheme?.addEventListener("click", () => this.toggleTheme());
 
     this.btnClearSlip?.addEventListener("click", () => {
-      this.workspace.slipNumbers = [null, null, null, null, null];
-      this.workspace.slipTensFilters = [null, null, null, null, null];
+      this.workspace.slipNumbers = emptyBallSlots(this.gameConfig);
+      this.workspace.slipTensFilters = emptyBallSlots(this.gameConfig);
       this.workspace.rowBuilder = [];
       this.renderCash5Workspace();
       this.saveToLocalStorage();
@@ -487,27 +550,28 @@ export class Cash5StudioApp {
   }
 
   loadSampleData(showToastMsg = true) {
-    this.draws = [...SAMPLE_CASH_5];
+    this.draws = [...SAMPLE_DRAWS_BY_GAME[this.activeGameId]];
     this.manualLines = [];
-    this.applyFilters();
+    this.applyFilters({ resetAnalysis: true });
+    this.saveToLocalStorage();
 
     if (showToastMsg) {
-      this.showToast("Sample Cash 5 drawings restored.");
+      this.showToast(`Sample ${this.gameConfig.displayName} drawings restored.`);
     }
   }
 
   async fetchLiveDraws() {
     this.btnFetchLive?.setAttribute("aria-busy", "true");
-    this.showToast("Updating Cash 5 drawings and jackpot…");
+    this.showToast(`Updating ${this.gameConfig.displayName} drawings and jackpot…`);
 
-    const update = await fetchLiveCash5Update();
+    const update = await fetchLiveGameUpdate(this.gameConfig);
 
     let drawCount = 0;
     if (update.draws.ok) {
       drawCount = update.draws.value.length;
       this.draws = update.draws.value;
       this.manualLines = [];
-      this.applyFilters();
+      this.applyFilters({ resetAnalysis: true });
     }
 
     if (update.jackpot.ok) {
@@ -516,11 +580,13 @@ export class Cash5StudioApp {
       this.cacheJackpot(this.jackpot);
     } else if (this.jackpot) {
       this.jackpotIsStale = true;
+      this.gameStates[this.activeGameId].jackpotIsStale = true;
     }
     this.updateJackpotStatus();
+    this.saveToLocalStorage();
 
     if (drawCount && update.jackpot.ok) {
-      this.showToast(`Updated ${drawCount} Cash 5 drawings. Jackpot ${this.jackpot.display}.`);
+      this.showToast(`Updated ${drawCount} ${this.gameConfig.displayName} drawings. Jackpot ${this.jackpot.display}.`);
     } else if (drawCount) {
       this.showToast(`Updated ${drawCount} drawings. Jackpot update failed${this.jackpot ? '; showing the last known amount.' : '.'}`);
     } else if (update.jackpot.ok) {
@@ -534,11 +600,13 @@ export class Cash5StudioApp {
     this.btnFetchLive?.removeAttribute("aria-busy");
   }
 
-  applyFilters() {
+  applyFilters({ resetAnalysis = false } = {}) {
     this.filteredDraws = cash5AnalysisWindow(this.draws);
     this.researchDraws = cash5ResearchWindow(this.draws);
-    this.workspace.motifSelections = [];
-    this.workspace.motifMatches = [];
+    if (resetAnalysis) {
+      this.workspace.motifSelections = [];
+      this.workspace.motifMatches = [];
+    }
     this.workspace.sessions = scorePendingSessions(this.workspace.sessions, this.draws);
     this.updateState();
   }
@@ -550,7 +618,7 @@ export class Cash5StudioApp {
       rowRoles[this.filteredDraws[this.filteredDraws.length - 1].id] = 'present';
     }
     if (this.gridMatrix) {
-      this.gridMatrix.setDraws(this.filteredDraws, "cash5", {
+      this.gridMatrix.setDraws(this.filteredDraws, this.activeGameId, {
         showTens: this.patternSettings.showTens,
         showOnes: this.patternSettings.showOnes,
         selectedCellIds: [],
@@ -609,7 +677,7 @@ export class Cash5StudioApp {
     const timestamp = new Date(this.jackpot.fetchedAt);
     if (!Number.isNaN(timestamp.getTime())) {
       const label = timestamp.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-      this.jackpotStatus.setAttribute('title', `Jackpot retrieved ${label} from the South Carolina Education Lottery.`);
+      this.jackpotStatus.setAttribute('title', `Jackpot retrieved ${label} from the Pennsylvania Lottery.`);
     }
   }
 
@@ -655,9 +723,9 @@ export class Cash5StudioApp {
     if (this.btnAddDraftRow) {
       this.btnAddDraftRow.addEventListener('click', () => {
         try {
-          this.workspace.draftRows.push(createDraftRow(this.workspace.slipNumbers));
-          this.workspace.slipNumbers = [null, null, null, null, null];
-          this.workspace.slipTensFilters = [null, null, null, null, null];
+          this.workspace.draftRows.push(createDraftRow(this.workspace.slipNumbers, 'uncertain', '', this.gameConfig));
+          this.workspace.slipNumbers = emptyBallSlots(this.gameConfig);
+          this.workspace.slipTensFilters = emptyBallSlots(this.gameConfig);
           this.workspace.rowBuilder = [];
           this.renderCash5Workspace();
           this.saveToLocalStorage();
@@ -671,12 +739,12 @@ export class Cash5StudioApp {
       this.btnFinalizeSession.addEventListener('click', () => {
         try {
           const latestDraw = this.filteredDraws[this.filteredDraws.length - 1];
-          const snapshot = finalizeSession(this.workspace, latestDraw);
+          const snapshot = finalizeSession(this.workspace, latestDraw, new Date(), this.gameConfig);
           this.workspace.sessions.unshift(snapshot);
           this.recentFinalizedSessionId = snapshot.id;
           this.workspace.draftRows = [];
-          this.workspace.slipNumbers = [null, null, null, null, null];
-          this.workspace.slipTensFilters = [null, null, null, null, null];
+          this.workspace.slipNumbers = emptyBallSlots(this.gameConfig);
+          this.workspace.slipTensFilters = emptyBallSlots(this.gameConfig);
           this.workspace.rowBuilder = [];
           this.renderCash5Workspace();
           this.saveToLocalStorage();
@@ -691,8 +759,8 @@ export class Cash5StudioApp {
   setSlipNumberForPosition(number, column) {
     const value = Number(number);
     const position = Number(column);
-    if (!Number.isInteger(value) || value < 1 || value > 42
-        || !Number.isInteger(position) || position < 0 || position > 4) return;
+    if (!Number.isInteger(value) || value < this.gameConfig.minimumNumber || value > this.gameConfig.maximumNumber
+        || !Number.isInteger(position) || position < 0 || position >= this.gameConfig.ballCount) return;
     this.workspace.slipNumbers[position] = value;
     this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
     this.renderCash5Workspace();
@@ -709,10 +777,10 @@ export class Cash5StudioApp {
     if (this.futureDigitGrid) {
       this.futureDigitGrid.innerHTML = `
         <div class="future-grid-corner">Digit</div>
-        ${Array.from({ length: 5 }, (_, column) => `<div class="future-space-head">Ball ${column + 1}</div>`).join('')}
+        ${Array.from({ length: this.gameConfig.ballCount }, (_, column) => `<div class="future-space-head">Ball ${column + 1}</div>`).join('')}
         ${Array.from({ length: 10 }, (_, digit) => `
           <div class="future-digit-label">${digit}</div>
-          ${Array.from({ length: 5 }, (_, column) => {
+          ${Array.from({ length: this.gameConfig.ballCount }, (_, column) => {
             const key = `${column}:${digit}`;
             const mapped = mappedKeys.has(key);
             const active = this.workspace.activeFutureCell?.column === column && this.workspace.activeFutureCell?.digit === digit;
@@ -727,7 +795,7 @@ export class Cash5StudioApp {
         button.addEventListener('click', () => {
           const column = Number(button.dataset.futureColumn);
           const digit = Number(button.dataset.futureDigit);
-          this.workspace.futureDigitMap = selectFutureDigit(this.workspace.futureDigitMap, column, digit);
+          this.workspace.futureDigitMap = selectFutureDigit(this.workspace.futureDigitMap, column, digit, this.gameConfig);
           this.workspace.motifMatches = [];
           this.workspace.activeFutureCell = { column, digit };
           this.gridMatrix?.setPositionHighlights(this.workspace.futureDigitMap);
@@ -743,7 +811,7 @@ export class Cash5StudioApp {
       if (!active) {
         this.futureMapInspector.innerHTML = '<strong>Start with a position.</strong><span> Choose a digit-space square to inspect recent context.</span>';
       } else {
-        const evidence = futureCellEvidence(this.researchDraws, this.workspace.motifMatches, active.column, active.digit);
+        const evidence = futureCellEvidence(this.researchDraws, this.workspace.motifMatches, active.column, active.digit, this.gameConfig);
         const isMapped = mappedKeys.has(`${active.column}:${active.digit}`);
         this.futureMapInspector.innerHTML = `
           <div class="future-inspector-head">
@@ -771,7 +839,7 @@ export class Cash5StudioApp {
     if (this.motifSelectionSummary) {
       this.motifSelectionSummary.classList.toggle('empty-state', selections.length === 0);
       this.motifSelectionSummary.innerHTML = selections.length
-        ? Array.from({ length: 5 }, (_, column) => {
+        ? Array.from({ length: this.gameConfig.ballCount }, (_, column) => {
           const mapped = selections.find(item => item.column === column);
           return mapped ? `<div><strong>Ball ${column + 1}</strong><span class="selection-square position-${column + 1}">${mapped.digit}</span></div>` : '';
         }).join('')
@@ -812,7 +880,7 @@ export class Cash5StudioApp {
     if (focusedMapping) this.workspace.activeFutureCell = { ...focusedMapping };
 
     if (this.candidateDigitsContainer) {
-      this.candidateDigitsContainer.innerHTML = Array.from({ length: 5 }, (_, column) => {
+      this.candidateDigitsContainer.innerHTML = Array.from({ length: this.gameConfig.ballCount }, (_, column) => {
         const mapped = selections.find(item => item.column === column);
         const active = mapped && focusedMapping?.column === column;
         return `<button class="position-evidence-tab position-${column + 1} ${active ? 'active' : ''}" data-evidence-column="${column}" ${mapped ? '' : 'disabled'} aria-pressed="${Boolean(active)}">
@@ -832,7 +900,7 @@ export class Cash5StudioApp {
 
     if (this.numberEvidence) {
       const evidence = focusedMapping
-        ? buildNumberEvidence(focusedMapping.digit, this.researchDraws, this.workspace.motifMatches, [focusedMapping.column])
+        ? buildNumberEvidence(focusedMapping.digit, this.researchDraws, this.workspace.motifMatches, [focusedMapping.column], this.gameConfig)
         : [];
       this.numberEvidence.classList.toggle('empty-state', !focusedMapping);
       const maxPattern = Math.max(...evidence.map(item => item.patternSignal), 1);
@@ -864,29 +932,30 @@ export class Cash5StudioApp {
     const legacyNumbers = Array.isArray(this.workspace.rowBuilder)
       ? this.workspace.rowBuilder.filter(Number.isInteger).sort((a, b) => a - b)
       : [];
-    if (!Array.isArray(this.workspace.slipNumbers) || this.workspace.slipNumbers.length !== 5) {
-      this.workspace.slipNumbers = Array.from({ length: 5 }, (_, index) => legacyNumbers[index] ?? null);
+    if (!Array.isArray(this.workspace.slipNumbers) || this.workspace.slipNumbers.length !== this.gameConfig.ballCount) {
+      this.workspace.slipNumbers = Array.from({ length: this.gameConfig.ballCount }, (_, index) => legacyNumbers[index] ?? null);
     }
     const slip = this.workspace.slipNumbers;
-    if (!Array.isArray(this.workspace.slipTensFilters) || this.workspace.slipTensFilters.length !== 5) {
-      this.workspace.slipTensFilters = [null, null, null, null, null];
+    if (!Array.isArray(this.workspace.slipTensFilters) || this.workspace.slipTensFilters.length !== this.gameConfig.ballCount) {
+      this.workspace.slipTensFilters = emptyBallSlots(this.gameConfig);
     }
     const tensFilters = this.workspace.slipTensFilters;
-    const tensRecommendations = recommendTensBands(this.filteredDraws);
+    const tensBands = getTensBands(this.gameConfig);
+    const tensRecommendations = recommendTensBands(this.filteredDraws, this.gameConfig);
     const filledNumbers = slip.filter(Number.isInteger);
     const mappedDigitByColumn = new Map((this.workspace.futureDigitMap || []).map(item => [item.column, item.digit]));
-    const isComplete = filledNumbers.length === 5
-      && new Set(filledNumbers).size === 5
+    const isComplete = filledNumbers.length === this.gameConfig.ballCount
+      && new Set(filledNumbers).size === this.gameConfig.ballCount
       && filledNumbers.every((number, index) => index === 0 || number > filledNumbers[index - 1])
       && slip.every((number, index) => !mappedDigitByColumn.has(index) || number % 10 === mappedDigitByColumn.get(index))
-      && slip.every((number, index) => !Number.isInteger(tensFilters[index]) || tensDigitForNumber(number) === tensFilters[index]);
+      && slip.every((number, index) => !Number.isInteger(tensFilters[index]) || tensDigitForNumber(number, this.gameConfig) === tensFilters[index]);
 
     if (this.rowBuilderContainer) {
-      this.rowBuilderContainer.innerHTML = Array.from({ length: 5 }, (_, index) => {
+      this.rowBuilderContainer.innerHTML = Array.from({ length: this.gameConfig.ballCount }, (_, index) => {
         const current = slip[index];
         const previousIndex = Array.from({ length: index }, (_, offset) => index - offset - 1)
           .find(position => Number.isInteger(slip[position]));
-        const nextIndex = Array.from({ length: 4 - index }, (_, offset) => index + offset + 1)
+        const nextIndex = Array.from({ length: this.gameConfig.ballCount - 1 - index }, (_, offset) => index + offset + 1)
           .find(position => Number.isInteger(slip[position]));
         const previous = previousIndex === undefined ? null : slip[previousIndex];
         const next = nextIndex === undefined ? null : slip[nextIndex];
@@ -897,13 +966,13 @@ export class Cash5StudioApp {
         const tensFilter = Number.isInteger(tensFilters[index]) ? tensFilters[index] : null;
         const recommendation = tensRecommendations[index];
         const minimum = Number.isInteger(previous) ? previous + (index - previousIndex) : index + 1;
-        const maximum = Number.isInteger(next) ? next - (nextIndex - index) : 42 - (4 - index);
-        const available = Array.from({ length: 42 }, (_, numberIndex) => numberIndex + 1)
+        const maximum = Number.isInteger(next) ? next - (nextIndex - index) : this.gameConfig.maximumNumber - (this.gameConfig.ballCount - 1 - index);
+        const available = numberRange(this.gameConfig)
           .filter(number => number >= minimum && number <= maximum)
           .filter(number => mappedDigits.length === 0 || mappedDigits.includes(number % 10))
-          .filter(number => tensFilter === null || tensDigitForNumber(number) === tensFilter);
+          .filter(number => tensFilter === null || tensDigitForNumber(number, this.gameConfig) === tensFilter);
         const currentMatchesMap = !Number.isInteger(current) || mappedDigits.length === 0 || mappedDigits.includes(current % 10);
-        const currentMatchesTens = !Number.isInteger(current) || tensFilter === null || tensDigitForNumber(current) === tensFilter;
+        const currentMatchesTens = !Number.isInteger(current) || tensFilter === null || tensDigitForNumber(current, this.gameConfig) === tensFilter;
         const currentIsUnique = !Number.isInteger(current) || slip.filter(number => number === current).length === 1;
         const currentIsOrdered = !Number.isInteger(current)
           || slip.slice(0, index).every(number => !Number.isInteger(number) || number < current)
@@ -914,7 +983,7 @@ export class Cash5StudioApp {
           ? `Showing numbers ending in ${mappedDigits.join(', ')}`
           : `All valid numbers ${minimum}–${maximum}`;
         const invalidMessage = !currentIsUnique ? `Number ${current} is already used in another Ball position.`
-          : !currentIsOrdered ? 'Numbers must increase from Ball 1 through Ball 5.'
+          : !currentIsOrdered ? `Numbers must increase from Ball 1 through Ball ${this.gameConfig.ballCount}.`
             : `Current ${current} does not match the updated filters; choose again or change a filter.`;
         return `<div class="slip-slot ${Number.isInteger(current) ? 'filled' : ''} ${currentIsValid ? '' : 'invalid'}">
           <span class="slip-slot-head"><strong>Ball ${index + 1}</strong>${mappedDigits.length ? `<span class="mapped-ending position-${index + 1}"><small>Mapped ending</small><b>${mappedDigits[0]}</b></span>` : '<span class="no-mapped-ending">No digit filter</span>'}</span>
@@ -925,7 +994,7 @@ export class Cash5StudioApp {
           <label class="slip-field-label">Tens range
             <select class="tens-filter-select" data-slip-tens="${index}" aria-label="Tens range for Ball ${index + 1}">
               <option value="">Any tens</option>
-              ${TENS_BANDS.map(band => `<option value="${band.digit}" ${band.digit === tensFilter ? 'selected' : ''}>${band.label}${band.digit === recommendation.primary.digit ? ` — ${recommendation.primary.confidence}` : band.digit === recommendation.alternate.digit ? ' — Alternate' : ''}</option>`).join('')}
+              ${tensBands.map(band => `<option value="${band.digit}" ${band.digit === tensFilter ? 'selected' : ''}>${band.label}${band.digit === recommendation.primary.digit ? ` — ${recommendation.primary.confidence}` : band.digit === recommendation.alternate.digit ? ' — Alternate' : ''}</option>`).join('')}
             </select>
           </label>
           <label class="slip-field-label">Full number
@@ -934,7 +1003,7 @@ export class Cash5StudioApp {
             ${options.map(number => `<option value="${number}" ${number === current ? 'selected' : ''}>${number}</option>`).join('')}
           </select>
           </label>
-          <small>${currentIsValid ? `${helper}${tensFilter === null ? '' : ` in ${TENS_BANDS.find(band => band.digit === tensFilter)?.label}`}. Alternate: ${recommendation.alternate.label}.` : invalidMessage}</small>
+          <small>${currentIsValid ? `${helper}${tensFilter === null ? '' : ` in ${tensBands.find(band => band.digit === tensFilter)?.label}`}. Alternate: ${recommendation.alternate.label}.` : invalidMessage}</small>
         </div>`;
       }).join('');
 
@@ -944,7 +1013,7 @@ export class Cash5StudioApp {
           const tens = select.value === '' ? null : Number(select.value);
           this.workspace.slipTensFilters[position] = tens;
           const current = this.workspace.slipNumbers[position];
-          if (Number.isInteger(current) && tens !== null && tensDigitForNumber(current) !== tens) this.workspace.slipNumbers[position] = null;
+          if (Number.isInteger(current) && tens !== null && tensDigitForNumber(current, this.gameConfig) !== tens) this.workspace.slipNumbers[position] = null;
           this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
           this.renderCash5Workspace();
           this.saveToLocalStorage();
@@ -956,7 +1025,7 @@ export class Cash5StudioApp {
           const tens = Number(button.dataset.useTens);
           this.workspace.slipTensFilters[position] = tens;
           const current = this.workspace.slipNumbers[position];
-          if (Number.isInteger(current) && tensDigitForNumber(current) !== tens) this.workspace.slipNumbers[position] = null;
+          if (Number.isInteger(current) && tensDigitForNumber(current, this.gameConfig) !== tens) this.workspace.slipNumbers[position] = null;
           this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
           this.renderCash5Workspace();
           this.saveToLocalStorage();
@@ -1022,7 +1091,7 @@ export class Cash5StudioApp {
           const row = this.workspace.draftRows.find(item => item.id === button.dataset.editRow);
           if (!row) return;
           this.workspace.slipNumbers = [...row.numbers];
-          this.workspace.slipTensFilters = [null, null, null, null, null];
+          this.workspace.slipTensFilters = emptyBallSlots(this.gameConfig);
           this.workspace.rowBuilder = [...row.numbers];
           this.workspace.draftRows = this.workspace.draftRows.filter(item => item.id !== row.id);
           this.renderCash5Workspace();
@@ -1051,19 +1120,16 @@ export class Cash5StudioApp {
       this.finalizeSharePrompt.innerHTML = '';
       return;
     }
-    const shareAvailable = typeof window.cash5StudioNativeShare === 'function';
     this.finalizeSharePrompt.innerHTML = `
       <div><strong>${session.rows.length} row${session.rows.length === 1 ? '' : 's'} finalized for the next draw.</strong><span>Your dated session is saved.</span></div>
       <div class="inline-actions">
         <button class="btn btn-primary" type="button" data-copy-finalized>Copy slips</button>
-        ${shareAvailable ? '<button class="btn btn-secondary" type="button" data-share-finalized>Share…</button>' : ''}
         <button class="text-btn" type="button" data-dismiss-finalized>Dismiss</button>
       </div>`;
     this.finalizeSharePrompt.querySelector('[data-copy-finalized]')?.addEventListener('click', async () => {
-      const copied = await this.copyText(formatSessionForMessage(session));
+      const copied = await this.copyText(formatSessionForMessage(session, this.gameConfig));
       this.showToast(copied ? 'Formatted slips copied.' : 'Copy failed.');
     });
-    this.finalizeSharePrompt.querySelector('[data-share-finalized]')?.addEventListener('click', () => this.shareSession(session));
     this.finalizeSharePrompt.querySelector('[data-dismiss-finalized]')?.addEventListener('click', () => {
       this.recentFinalizedSessionId = null;
       this.renderFinalizeSharePrompt();
@@ -1089,8 +1155,7 @@ export class Cash5StudioApp {
           <div class="score-line">Rows: ${session.result.rowScores.map(score => `<b>${score.hits}/5</b>`).join(' ')}</div>
         ` : '<div class="pending-result">Waiting for a newer imported or fetched drawing.</div>'}
         <div class="session-actions">
-          <button class="mini-btn" data-copy-session="${escapeHTML(session.id)}">Copy for iMessage</button>
-          ${typeof window.cash5StudioNativeShare === 'function' ? `<button class="mini-btn" data-share-session="${escapeHTML(session.id)}">Share…</button>` : ''}
+          <button class="mini-btn" data-copy-session="${escapeHTML(session.id)}">Copy slips</button>
           <button class="mini-btn" data-edit-session="${escapeHTML(session.id)}">${session.result ? 'Reuse in Ticket Builder' : 'Edit in Ticket Builder'}</button>
         </div>
       </div>
@@ -1098,10 +1163,10 @@ export class Cash5StudioApp {
     this.sessionHistory.querySelectorAll('[data-copy-session]').forEach(button => {
       button.addEventListener('click', async () => {
         const session = this.workspace.sessions.find(item => item.id === button.dataset.copySession);
-        const text = formatSessionForMessage(session);
+        const text = formatSessionForMessage(session, this.gameConfig);
         if (!text) return;
         const copied = await this.copyText(text);
-        this.showToast(copied ? 'Formatted slips copied. Paste them into iMessage.' : 'Copy failed. Select the rows and copy them manually.');
+        this.showToast(copied ? 'Formatted slips copied to the clipboard.' : 'Copy failed. Select the rows and copy them manually.');
       });
     });
     this.sessionHistory.querySelectorAll('[data-edit-session]').forEach(button => {
@@ -1116,26 +1181,11 @@ export class Cash5StudioApp {
         this.showToast(wasScored ? 'Rows copied into Ticket Builder.' : 'Session unlocked in Ticket Builder. Edit and finalize it again when ready.');
       });
     });
-    this.sessionHistory.querySelectorAll('[data-share-session]').forEach(button => {
-      button.addEventListener('click', () => {
-        const session = this.workspace.sessions.find(item => item.id === button.dataset.shareSession);
-        if (session) this.shareSession(session);
-      });
-    });
-  }
-
-  async shareSession(session) {
-    const text = formatSessionForMessage(session);
-    if (!text || typeof window.cash5StudioNativeShare !== 'function') return;
-    try {
-      await window.cash5StudioNativeShare(text);
-    } catch (error) {
-      this.showToast(`Share failed: ${error?.message || 'Native share is unavailable.'}`);
-    }
   }
 
   async copyText(text) {
     try {
+      if (typeof window.pa5Desktop?.copyText === 'function') return Boolean(await window.pa5Desktop.copyText(text));
       await navigator.clipboard.writeText(text);
       return true;
     } catch (_) {
@@ -1153,50 +1203,49 @@ export class Cash5StudioApp {
   }
 
   saveToLocalStorage() {
-    const projectData = {
-      appName: "Cash 5 Studio",
-      version: 3,
-      draws: this.draws,
-      manualLines: this.manualLines,
-      workspace: this.workspace
-    };
+    const projectData = this.buildProjectData();
     try {
-      localStorage.setItem("cash5studio_current_project", JSON.stringify(projectData));
+      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projectData));
     } catch (e) {}
   }
 
+  buildProjectData() {
+    this.commitActiveGameState();
+    return { appName: 'PA 5 Studio', version: 4, activeGame: this.activeGameId, games: this.gameStates };
+  }
+
   loadFromLocalStorage() {
-    const current = localStorage.getItem("cash5studio_current_project");
-    const raw = current || localStorage.getItem("lottoplus_current_project");
+    const raw = localStorage.getItem(PROJECT_STORAGE_KEY);
     if (!raw) return;
     try {
       const data = JSON.parse(raw);
       const valRes = validateProject(data);
       if (valRes.valid) {
-        this.draws = valRes.validDraws;
-        this.manualLines = valRes.manualLines;
-        this.workspace = valRes.workspace ? { ...createWorkspaceState(), ...valRes.workspace } : createWorkspaceState();
-        if (!current) this.saveToLocalStorage();
+        this.gameStates = Object.fromEntries(GAME_IDS.map(gameId => [gameId, {
+          ...valRes.games[gameId],
+          workspace: { ...createWorkspaceState(gameId), ...valRes.games[gameId].workspace }
+        }]));
+        this.loadActiveGameState(valRes.activeGame);
       }
     } catch (e) {}
   }
 
-  exportProjectFile() {
-    const project = {
-      appName: "Cash 5 Studio",
-      version: 3,
-      draws: this.draws,
-      manualLines: this.manualLines,
-      workspace: this.workspace
-    };
-    const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+  async exportProjectFile() {
+    const contents = JSON.stringify(this.buildProjectData(), null, 2);
+    const filename = `pa5-studio_${new Date().toISOString().split('T')[0]}.pa5studio`;
+    if (typeof window.pa5Desktop?.saveProject === 'function') {
+      const saved = await window.pa5Desktop.saveProject(contents, filename);
+      if (saved) this.showToast('PA 5 Studio project saved.');
+      return;
+    }
+    const blob = new Blob([contents], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cash5-studio_${new Date().toISOString().split('T')[0]}.cash5studio`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    this.showToast("Cash 5 Studio project saved.");
+    this.showToast('PA 5 Studio project saved.');
   }
 
   importProjectFile(e) {
@@ -1212,11 +1261,14 @@ export class Cash5StudioApp {
           return;
         }
 
-        this.draws = valRes.validDraws;
-        this.manualLines = valRes.manualLines;
-        this.workspace = valRes.workspace ? { ...createWorkspaceState(), ...valRes.workspace } : createWorkspaceState();
+        this.gameStates = Object.fromEntries(GAME_IDS.map(gameId => [gameId, {
+          ...valRes.games[gameId], workspace: { ...createWorkspaceState(gameId), ...valRes.games[gameId].workspace }
+        }]));
+        this.loadActiveGameState(valRes.activeGame);
+        this.applyGameLabels();
         this.applyFilters();
-        this.showToast(`Project opened with ${this.draws.length} valid draws.`);
+        this.saveToLocalStorage();
+        this.showToast('PA 5 Studio project opened.');
       } catch (err) {
         this.showToast("Import failed: invalid JSON project file.");
       }
@@ -1233,16 +1285,17 @@ export class Cash5StudioApp {
       try {
         const parsed = parseCSV(evt.target.result);
         const mapping = autoMapColumns(parsed.headers);
-        const res = convertRowsToDraws(parsed.headers, parsed.rows, mapping);
+        const res = convertRowsToDraws(parsed.headers, parsed.rows, mapping, this.gameConfig);
 
         if (!res.draws || res.draws.length === 0) {
-          this.showToast("No valid Cash 5 drawings were found in the CSV file.");
+          this.showToast(`No valid ${this.gameConfig.displayName} drawings were found in the CSV file.`);
           return;
         }
 
         this.draws = res.draws;
         this.manualLines = [];
-        this.applyFilters();
+        this.applyFilters({ resetAnalysis: true });
+        this.saveToLocalStorage();
 
         if (res.errors.length > 0) {
           this.showToast(`Imported ${res.draws.length} draws; ${res.errors.length} invalid rows were skipped.`);
@@ -1281,5 +1334,5 @@ export class Cash5StudioApp {
 }
 
 // Global App Initialization
-const app = new Cash5StudioApp();
+const app = new PA5StudioApp();
 window.app = app;

@@ -1,4 +1,4 @@
-/** Flexible CSV importer for SC Palmetto Cash 5 exports. */
+/** Flexible CSV importer for PA 5 Studio game results. */
 
 import { validateDraw } from './validation.js';
 
@@ -67,7 +67,7 @@ export function autoMapColumns(headers) {
   return mapping;
 }
 
-export function convertRowsToDraws(headers, dataRows, mapping) {
+export function convertRowsToDraws(headers, dataRows, mapping, game = 'cash5') {
   const draws = [];
   const errors = [];
 
@@ -101,7 +101,7 @@ export function convertRowsToDraws(headers, dataRows, mapping) {
       numbers
     };
 
-    const valResult = validateDraw(candidateDraw);
+    const valResult = validateDraw(candidateDraw, game);
     if (valResult.valid) {
       draws.push(valResult.draw);
     } else {

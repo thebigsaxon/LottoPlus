@@ -1,10 +1,13 @@
 {
-  "name": "cash5-studio",
+  "name": "pa5-studio",
   "version": "1.0.0",
-  "description": "SC Palmetto Cash 5 historical draw analysis studio",
+  "description": "Pennsylvania Cash 5 and Treasure Hunt historical draw analysis studio",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "start": "electron .",
+    "build:win": "electron-builder --win portable --x64"
   },
   "keywords": [
     "lottery",
@@ -12,5 +15,33 @@
     "visualization"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@11.19.0",
+  "devDependencies": {
+    "electron": "43.4.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.pa5studio.windows",
+    "productName": "PA 5 Studio",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "css/**/*",
+      "js/**/*",
+      "assets/AppIcon1024.png",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/AppIcon1024.png",
+      "target": [{ "target": "portable", "arch": ["x64"] }]
+    },
+    "portable": {
+      "artifactName": "PA-5-Studio-${version}-portable-x64.exe"
+    }
+  }
 }

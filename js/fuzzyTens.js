@@ -1,10 +1,20 @@
-const TENS_BANDS = [
-  { digit: 0, label: '1–9', shortLabel: '1–9' },
-  { digit: 1, label: '10s', shortLabel: '10s' },
-  { digit: 2, label: '20s', shortLabel: '20s' },
-  { digit: 3, label: '30s', shortLabel: '30s' },
-  { digit: 4, label: '40–42', shortLabel: '40s' }
-];
+import { getGameConfig } from './gameConfig.js';
+
+export function getTensBands(game = 'cash5') {
+  const config = getGameConfig(game);
+  const bands = [];
+  for (let digit = Math.floor(config.minimumNumber / 10); digit <= Math.floor(config.maximumNumber / 10); digit += 1) {
+    const lower = Math.max(config.minimumNumber, digit * 10);
+    const upper = Math.min(config.maximumNumber, digit * 10 + 9);
+    const label = digit === 0
+      ? `${lower}–${upper}`
+      : lower === upper ? String(lower) : upper === digit * 10 + 9 ? `${digit}0s` : `${lower}–${upper}`;
+    bands.push({ digit, label, shortLabel: digit === 0 ? label : `${digit}0s` });
+  }
+  return bands;
+}
+
+const TENS_BANDS = getTensBands('cash5');
 
 const clamp = value => Math.max(0, Math.min(1, value));
 
@@ -17,33 +27,36 @@ function medium(value) {
 
 function high(value) { return clamp((value - 0.30) / 0.48); }
 
-export function tensDigitForNumber(number) {
+export function tensDigitForNumber(number, game = 'cash5') {
+  const config = getGameConfig(game);
   const value = Number(number);
-  if (!Number.isInteger(value) || value < 1 || value > 42) return null;
+  if (!Number.isInteger(value) || value < config.minimumNumber || value > config.maximumNumber) return null;
   return Math.floor(value / 10);
 }
 
-export function tensBandLabel(digit) {
-  return TENS_BANDS.find(item => item.digit === Number(digit))?.label || 'Any tens';
+export function tensBandLabel(digit, game = 'cash5') {
+  return getTensBands(game).find(item => item.digit === Number(digit))?.label || 'Any tens';
 }
 
 /** Ranks tens bands using fuzzy position, recency, and adjacent-position rules. */
-export function recommendTensBands(draws = []) {
-  const history = (draws || []).filter(draw => Array.isArray(draw?.numbers) && draw.numbers.length === 5);
+export function recommendTensBands(draws = [], game = 'cash5') {
+  const config = getGameConfig(game);
+  const tensBands = getTensBands(config);
+  const history = (draws || []).filter(draw => Array.isArray(draw?.numbers) && draw.numbers.length === config.ballCount);
   const drawCount = history.length;
   const recentWeights = history.map((_, index) => index + 1);
   const weightTotal = recentWeights.reduce((sum, value) => sum + value, 0) || 1;
 
-  return Array.from({ length: 5 }, (_, column) => {
-    const neighbors = [column - 1, column + 1].filter(index => index >= 0 && index < 5);
-    const ranked = TENS_BANDS.map(band => {
-      const positionCount = history.filter(draw => tensDigitForNumber(draw.numbers[column]) === band.digit).length;
+  return Array.from({ length: config.ballCount }, (_, column) => {
+    const neighbors = [column - 1, column + 1].filter(index => index >= 0 && index < config.ballCount);
+    const ranked = tensBands.map(band => {
+      const positionCount = history.filter(draw => tensDigitForNumber(draw.numbers[column], config) === band.digit).length;
       const positionRate = drawCount ? positionCount / drawCount : 0;
       const recentRate = history.reduce((sum, draw, index) => (
-        sum + (tensDigitForNumber(draw.numbers[column]) === band.digit ? recentWeights[index] : 0)
+        sum + (tensDigitForNumber(draw.numbers[column], config) === band.digit ? recentWeights[index] : 0)
       ), 0) / weightTotal;
       const neighborCount = history.reduce((sum, draw) => (
-        sum + neighbors.filter(index => tensDigitForNumber(draw.numbers[index]) === band.digit).length
+        sum + neighbors.filter(index => tensDigitForNumber(draw.numbers[index], config) === band.digit).length
       ), 0);
       const neighborRate = drawCount && neighbors.length ? neighborCount / (drawCount * neighbors.length) : 0;
 

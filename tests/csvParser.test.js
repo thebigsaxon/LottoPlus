@@ -23,4 +23,8 @@ test('parseCSV handles comma and tab separators and header filtering', () => {
   const res = convertRowsToDraws(parsed.headers, parsed.rows, mapping, 'cash5');
   assert.equal(res.draws.length, 2);
   assert.deepEqual(res.draws[0].numbers, [1, 5, 6, 11, 39]);
+
+  const treasure = convertRowsToDraws(parsed.headers, parsed.rows, mapping, 'treasureHunt');
+  assert.equal(treasure.draws.length, 0);
+  assert.equal(treasure.errors.length, 2);
 });

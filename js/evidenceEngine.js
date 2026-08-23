@@ -1,14 +1,17 @@
 import { drawToOnes, onesDigit } from './onesAnalysis.js';
+import { getGameConfig, numberRange } from './gameConfig.js';
 
-export function validCash5NumbersForDigit(digit) {
+export function validNumbersForDigit(digit, game = 'cash5') {
   const target = Number(digit);
-  return Array.from({ length: 42 }, (_, index) => index + 1)
+  return numberRange(getGameConfig(game))
     .filter(number => onesDigit(number) === target);
 }
 
-export function buildNumberEvidence(digit, draws, motifMatches = [], selectedColumns = []) {
+export const validCash5NumbersForDigit = validNumbersForDigit;
+
+export function buildNumberEvidence(digit, draws, motifMatches = [], selectedColumns = [], game = 'cash5') {
   const chronological = draws || [];
-  const items = validCash5NumbersForDigit(digit).map(number => {
+  const items = validNumbersForDigit(digit, game).map(number => {
     let frequency = 0;
     let mostRecentRowsAgo = null;
     let sameColumnCount = 0;

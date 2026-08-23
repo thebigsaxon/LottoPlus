@@ -4,18 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <title>Cash 5 Studio</title>
-  <script>
-    (() => {
-      try {
-        const savedTheme = localStorage.getItem('cash5studio_theme');
-        document.documentElement.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light';
-      } catch (_) {
-        document.documentElement.dataset.theme = 'light';
-      }
-    })();
-  </script>
-  <link rel="stylesheet" href="css/styles.css?v=9">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PA 5 Studio</title>
+  <script src="js/themeBoot.js"></script>
+  <link rel="stylesheet" href="css/styles.css?v=10">
 </head>
 <body>
   <header class="app-toolbar">
@@ -27,9 +19,13 @@
         </svg>
       </div>
       <div>
-        <h1>Cash 5 Studio</h1>
-        <p>SC Palmetto Cash 5 <span aria-hidden="true">·</span> <span id="latestDrawStatus">Loading draws…</span> <span aria-hidden="true">·</span> <span id="jackpotStatus">Jackpot unavailable</span></p>
+        <h1>PA 5 Studio</h1>
+        <p><span id="activeGameName">Cash 5</span> <span aria-hidden="true">·</span> <span id="latestDrawStatus">Loading draws…</span> <span aria-hidden="true">·</span> <span id="jackpotStatus">Jackpot unavailable</span></p>
       </div>
+    </div>
+    <div class="game-switch" id="gameSwitch" role="group" aria-label="Pennsylvania game">
+      <button type="button" class="active" data-game-id="cash5" aria-pressed="true">Cash 5</button>
+      <button type="button" data-game-id="treasureHunt" aria-pressed="false">Treasure Hunt</button>
     </div>
     <nav class="toolbar-actions" aria-label="Application actions">
       <button class="toolbar-btn" id="btnSessions" type="button" aria-expanded="false" aria-controls="sessionsPanel">
@@ -43,9 +39,9 @@
           <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
         </summary>
         <div class="menu-surface" role="menu">
-          <button id="btnImportCsv" type="button" role="menuitem">Import CSV…<kbd>⌘I</kbd></button>
-          <button id="btnOpenProject" type="button" role="menuitem">Open Project…<kbd>⌘O</kbd></button>
-          <button id="btnSaveProject" type="button" role="menuitem">Save Project<kbd>⌘S</kbd></button>
+          <button id="btnImportCsv" type="button" role="menuitem">Import CSV…<kbd>Ctrl+I</kbd></button>
+          <button id="btnOpenProject" type="button" role="menuitem">Open Project…<kbd>Ctrl+O</kbd></button>
+          <button id="btnSaveProject" type="button" role="menuitem">Save Project<kbd>Ctrl+S</kbd></button>
           <hr>
           <button id="btnLoadSample" type="button" role="menuitem">Restore Sample Data</button>
         </div>
@@ -55,9 +51,9 @@
         <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"></path></svg>
       </button>
       <div class="zoom-controls" role="group" aria-label="Interface zoom">
-        <button id="btnZoomOut" type="button" aria-label="Zoom out" title="Zoom out (⌘−)">−</button>
-        <button id="btnZoomReset" type="button" aria-label="Reset zoom" title="Reset zoom (⌘0)"><span id="zoomLevel">100%</span></button>
-        <button id="btnZoomIn" type="button" aria-label="Zoom in" title="Zoom in (⌘+)">+</button>
+        <button id="btnZoomOut" type="button" aria-label="Zoom out" title="Zoom out (Ctrl−)">−</button>
+        <button id="btnZoomReset" type="button" aria-label="Reset zoom" title="Reset zoom (Ctrl+0)"><span id="zoomLevel">100%</span></button>
+        <button id="btnZoomIn" type="button" aria-label="Zoom in" title="Zoom in (Ctrl+)">+</button>
       </div>
       <button class="btn btn-primary" id="btnFetchLive" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"></path></svg>
@@ -67,10 +63,10 @@
   </header>
 
   <input type="file" id="csvFileInput" accept=".csv,.txt" hidden>
-  <input type="file" id="projectFileInput" accept=".cash5studio,.lottoplus,.json" hidden>
+  <input type="file" id="projectFileInput" accept=".pa5studio,.json" hidden>
 
   <main class="app-main" id="cash5Workspace">
-    <section class="primary-workspace" aria-label="Cash 5 analysis workspace">
+    <section class="primary-workspace" id="workspaceLabel" aria-label="Cash 5 analysis workspace">
       <article class="surface history-surface">
         <header class="surface-header">
           <div><span class="eyebrow">Latest 10 drawings</span><h2>Draw History</h2></div>
@@ -187,7 +183,7 @@
 
     <footer class="app-footer">
       <button class="footer-note" id="btnAboutAnalysis" type="button" aria-expanded="false" aria-controls="analysisNotice">About this analysis</button>
-      <p id="analysisNotice" hidden>Cash 5 Studio describes historical data. Lottery drawings are independent random events, and visual patterns do not predict future results.</p>
+      <p id="analysisNotice" hidden>PA 5 Studio describes historical data for entertainment and study. Lottery drawings are independent random events, and visual patterns do not predict future results. Players must be 18 or older. Please play responsibly.</p>
     </footer>
   </main>
 
@@ -200,6 +196,6 @@
   </aside>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  <script type="module" src="js/app.js?v=13"></script>
+  <script type="module" src="js/app.js?v=14"></script>
 </body>
 </html>

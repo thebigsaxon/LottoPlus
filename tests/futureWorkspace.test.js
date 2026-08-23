@@ -74,4 +74,6 @@ test('future cell evidence stays scoped to the selected space', () => {
   assert.equal(evidence.windowCount, 2);
   assert.equal(evidence.motifCount, 1);
   assert.deepEqual(evidence.fullNumbers.find(item => item.number === 25), { number: 25, spaceCount: 2 });
+  const treasureEvidence = futureCellEvidence(evidenceDraws, matches, 2, 1, 'treasureHunt');
+  assert.equal(treasureEvidence.fullNumbers.at(-1).number, 21);
 });

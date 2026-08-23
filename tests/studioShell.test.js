@@ -2,78 +2,60 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const htmlPath = new URL('../index.html', import.meta.url);
-const appPath = new URL('../js/app.js', import.meta.url);
-const gridPath = new URL('../js/gridMatrix.js', import.meta.url);
-const webViewPath = new URL('../LottoPlusApp/WebView.swift', import.meta.url);
+const read = relative => readFile(new URL(`../${relative}`, import.meta.url), 'utf8');
 
-test('Cash 5 Studio shell exposes contextual pattern, annotation, and session surfaces', async () => {
-  const html = await readFile(htmlPath, 'utf8');
-  assert.match(html, /<h1>Cash 5 Studio<\/h1>/);
+test('PA 5 Studio shell exposes both games and the full analysis workflow', async () => {
+  const html = await read('index.html');
+  assert.match(html, /<h1>PA 5 Studio<\/h1>/);
+  assert.match(html, /data-game-id="cash5"/);
+  assert.match(html, /data-game-id="treasureHunt"/);
   assert.match(html, /id="patternsPopover" hidden/);
   assert.match(html, /id="annotationToolbar" hidden/);
   assert.match(html, />Save row</);
   assert.match(html, /id="finalizeSharePrompt" hidden/);
-  assert.doesNotMatch(html, /Numbers saved from optional evidence/);
-  assert.doesNotMatch(html, /Historical signal/);
   assert.match(html, /Your five positions/);
   assert.match(html, /latest 50 loaded drawings/);
   assert.match(html, /id="sessionsPanel" hidden/);
-  assert.match(html, /id="composerCard"/);
-  assert.match(html, /id="btnZoomOut"/);
-  assert.match(html, /id="btnZoomReset"/);
-  assert.match(html, /id="btnZoomIn"/);
   assert.match(html, /id="btnTheme"/);
   assert.match(html, /id="jackpotStatus"/);
-  assert.match(html, /cash5studio_theme/);
-  assert.match(html, /Build Your 5-Number Slip/);
-  assert.match(html, /Optional research tool/);
-  assert.match(html, /Map at least one digit on the Next Draw Board/);
-  assert.doesNotMatch(html, /Select at least one digit in each row/);
-  assert.doesNotMatch(html, /Powerball|Mega Millions|game-tabs/);
+  assert.match(html, /Ctrl\+I/);
+  assert.match(html, /\.pa5studio/);
+  assert.match(html, /Players must be 18 or older/);
 });
 
-test('position highlighting, click-off Patterns, and native sharing are wired', async () => {
-  const [appSource, gridSource, webViewSource] = await Promise.all([
-    readFile(appPath, 'utf8'),
-    readFile(gridPath, 'utf8'),
-    readFile(webViewPath, 'utf8')
-  ]);
-  assert.match(appSource, /document\.addEventListener\("pointerdown"/);
-  assert.match(appSource, /patternsPopover\.contains\(event\.target\)/);
-  assert.match(appSource, /findBoardSimilarSequences\(this\.researchDraws/);
-  assert.match(appSource, /buildNumberEvidence\(focusedMapping\.digit, this\.researchDraws/);
+test('renderer wires position research and independent game-aware updates', async () => {
+  const [appSource, gridSource] = await Promise.all([read('js/app.js'), read('js/gridMatrix.js')]);
+  assert.match(appSource, /switchGame\(gameId\)/);
+  assert.match(appSource, /fetchLiveGameUpdate\(this\.gameConfig\)/);
+  assert.match(appSource, /buildNumberEvidence\([\s\S]*this\.gameConfig\)/);
+  assert.match(appSource, /futureCellEvidence\([\s\S]*this\.gameConfig\)/);
+  assert.match(appSource, /pa5studio_current_project_v4/);
+  assert.match(appSource, /version: 4/);
+  assert.match(appSource, /Copy slips/);
+  assert.doesNotMatch(appSource, /cash5StudioNativeShare|iMessage/);
   assert.match(gridSource, /setPositionHighlights/);
-  assert.match(gridSource, /position-highlighted/);
-  assert.match(webViewSource, /NSSharingServicePicker/);
-  assert.match(webViewSource, /cash5StudioNativeShare/);
 });
 
-test('interface zoom is persistent and constrained to readable steps', async () => {
-  const source = await readFile(appPath, 'utf8');
-  assert.match(source, /cash5studio_interface_zoom/);
-  assert.match(source, /INTERFACE_ZOOM_STEPS = \[0\.9, 1, 1\.1, 1\.2, 1\.3, 1\.4, 1\.5\]/);
-  assert.match(source, /document\.body\.style\.zoom/);
+test('Electron shell isolates the renderer and restricts privileged APIs', async () => {
+  const [main, preload] = await Promise.all([read('electron/main.cjs'), read('electron/preload.cjs')]);
+  assert.match(main, /nodeIntegration: false/);
+  assert.match(main, /contextIsolation: true/);
+  assert.match(main, /sandbox: true/);
+  assert.match(main, /hostname !== 'www\.palottery\.pa\.gov'/);
+  assert.match(main, /PastWinningNumbers\.ashx/);
+  assert.match(main, /setPermissionRequestHandler/);
+  assert.match(main, /setWindowOpenHandler/);
+  assert.match(preload, /contextBridge\.exposeInMainWorld\('pa5Desktop'/);
+  assert.match(preload, /fetchOfficial/);
+  assert.match(preload, /copyText/);
+  assert.doesNotMatch(preload, /exposeInMainWorld\('pa5Desktop',\s*ipcRenderer/);
 });
 
-test('manual themes and independent live jackpot updates are wired', async () => {
-  const [html, appSource, webViewSource] = await Promise.all([
-    readFile(htmlPath, 'utf8'),
-    readFile(appPath, 'utf8'),
-    readFile(webViewPath, 'utf8')
-  ]);
-  assert.match(html, /data-theme/);
-  assert.match(appSource, /cash5studio_theme/);
-  assert.match(appSource, /cash5studio_last_jackpot/);
-  assert.match(appSource, /fetchLiveCash5Update/);
-  assert.match(appSource, /Last known jackpot/);
-  assert.match(webViewSource, /www\.sceducationlottery\.com/);
-});
-
-test('project persistence uses version 3 while retaining one-way legacy Cash 5 migration', async () => {
-  const source = await readFile(appPath, 'utf8');
-  assert.match(source, /version: 3/);
-  assert.match(source, /cash5studio_current_project/);
-  assert.match(source, /lottoplus_current_project/);
-  assert.match(source, /\.cash5studio/);
+test('portable Windows packaging and CI are configured for x64', async () => {
+  const [pkg, workflow] = await Promise.all([read('package.json'), read('.github/workflows/windows-portable.yml')]);
+  assert.match(pkg, /"productName": "PA 5 Studio"/);
+  assert.match(pkg, /"target": "portable"/);
+  assert.match(pkg, /"arch": \["x64"\]/);
+  assert.match(workflow, /runs-on: windows-latest/);
+  assert.match(workflow, /pnpm build:win/);
 });

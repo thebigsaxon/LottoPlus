@@ -1,3 +1,5 @@
+import { getGameConfig } from './gameConfig.js';
+
 function uniqueSortedNumbers(values) {
   return [...new Set((values || []).map(Number))].sort((a, b) => a - b);
 }
@@ -12,15 +14,17 @@ export function clearCandidateState(workspace = {}) {
   };
 }
 
-export function validateTicketRow(numbers) {
+export function validateTicketRow(numbers, game = 'cash5') {
+  const config = getGameConfig(game);
   const normalized = uniqueSortedNumbers(numbers);
-  const valid = normalized.length === 5 && normalized.every(number => Number.isInteger(number) && number >= 1 && number <= 42);
+  const valid = normalized.length === config.ballCount && normalized.every(number => Number.isInteger(number) && number >= config.minimumNumber && number <= config.maximumNumber);
   return { valid, numbers: valid ? normalized : [] };
 }
 
-export function createDraftRow(numbers, label = 'uncertain', note = '') {
-  const result = validateTicketRow(numbers);
-  if (!result.valid) throw new Error('A ticket row requires five unique Cash 5 numbers from 1 to 42.');
+export function createDraftRow(numbers, label = 'uncertain', note = '', game = 'cash5') {
+  const config = getGameConfig(game);
+  const result = validateTicketRow(numbers, config);
+  if (!result.valid) throw new Error(`A ticket row requires ${config.ballCount} unique ${config.displayName} numbers from ${config.minimumNumber} to ${config.maximumNumber}.`);
   return {
     id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     numbers: result.numbers,
@@ -29,12 +33,14 @@ export function createDraftRow(numbers, label = 'uncertain', note = '') {
   };
 }
 
-export function finalizeSession(workspace, latestDraw, now = new Date()) {
+export function finalizeSession(workspace, latestDraw, now = new Date(), game = 'cash5') {
+  const config = getGameConfig(game);
   if (!latestDraw) throw new Error('A latest draw is required to finalize a session.');
   if (!workspace.draftRows?.length) throw new Error('Add at least one complete ticket row before finalizing.');
 
   const snapshot = {
     id: `session-${now.getTime()}`,
+    gameId: config.id,
     status: 'locked',
     finalizedAt: now.toISOString(),
     baselineDrawId: latestDraw.id,
@@ -50,9 +56,10 @@ export function finalizeSession(workspace, latestDraw, now = new Date()) {
   return snapshot;
 }
 
-export function formatSessionForMessage(session) {
+export function formatSessionForMessage(session, game = session?.gameId || 'cash5') {
+  const config = getGameConfig(game);
   if (!session?.rows?.length) return '';
-  const heading = `Cash 5 slips — next draw after ${session.baselineDate}`;
+  const heading = `${config.displayName} slips — next draw after ${session.baselineDate}`;
   const rows = session.rows.map((row, index) => (
     `Row ${index + 1}: ${row.numbers.map(number => String(number).padStart(2, '0')).join(' - ')}`
   ));

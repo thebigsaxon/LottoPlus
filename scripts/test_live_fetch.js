@@ -1,16 +1,17 @@
-/** Manual smoke test for the Cash 5 Studio live source. */
+/** Manual smoke test for PA 5 Studio's two official live sources. */
 
-const SOURCE = 'https://www.lotteryusa.com/south-carolina/palmetto-cash-5/year';
+import { fetchGameDraws, fetchGameJackpot } from '../js/liveFetcher.js';
+import { GAME_IDS, getGameConfig } from '../js/gameConfig.js';
 
 async function run() {
-  const response = await fetch(SOURCE, {
-    headers: { 'User-Agent': 'Mozilla/5.0 AppleWebKit/605.1.15' }
-  });
-  if (!response.ok) throw new Error(`Cash 5 source returned HTTP ${response.status}`);
-  const html = await response.text();
-  const cards = (html.match(/c-draw-card/g) || []).length;
-  if (!cards) throw new Error('Cash 5 source did not contain recognizable draw cards');
-  console.log(`Cash 5 source returned ${cards} draw-card markers.`);
+  for (const gameId of GAME_IDS) {
+    const config = getGameConfig(gameId);
+    const [draws, jackpot] = await Promise.all([
+      fetchGameDraws(config),
+      fetchGameJackpot(config)
+    ]);
+    console.log(`${config.displayName}: ${draws.length} validated draws; next jackpot ${jackpot.display}.`);
+  }
 }
 
 run().catch(error => {

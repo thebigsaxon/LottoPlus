@@ -1,0 +1,32 @@
+name: Windows portable build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [pa-c5-th]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PA-5-Studio-Windows-x64
+          path: dist/PA-5-Studio-*-portable-x64.exe
+          if-no-files-found: error

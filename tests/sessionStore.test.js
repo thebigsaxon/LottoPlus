@@ -24,10 +24,11 @@ test('clearing candidates preserves completed rows and locked sessions', () => {
   assert.equal(cleared.sessions, sessions);
 });
 
-test('ticket rows require five unique Cash 5 numbers', () => {
+test('ticket rows apply each game range', () => {
   assert.equal(validateTicketRow([1, 2, 3, 4, 5]).valid, true);
   assert.equal(validateTicketRow([1, 1, 2, 3, 4]).valid, false);
-  assert.equal(validateTicketRow([1, 2, 3, 4, 43]).valid, false);
+  assert.equal(validateTicketRow([1, 2, 3, 4, 43], 'cash5').valid, true);
+  assert.equal(validateTicketRow([1, 2, 3, 4, 31], 'treasureHunt').valid, false);
 });
 
 test('finalized snapshot is independent from later draft mutations', () => {
@@ -52,7 +53,7 @@ test('session scores against the first draw after its baseline', () => {
   assert.equal(scored.result.rowScores[0].hits, 2);
 });
 
-test('locked slips format cleanly for copying into iMessage', () => {
+test('locked slips format cleanly for the active game', () => {
   const session = finalizeSession({ fullCandidates: [], draftRows: [
     createDraftRow([1, 5, 12, 23, 42]),
     createDraftRow([2, 9, 17, 31, 40])
@@ -62,6 +63,11 @@ test('locked slips format cleanly for copying into iMessage', () => {
     'Row 1: 01 - 05 - 12 - 23 - 42',
     'Row 2: 02 - 09 - 17 - 31 - 40'
   ].join('\n'));
+
+  const treasure = finalizeSession({ fullCandidates: [], draftRows: [
+    createDraftRow([1, 5, 12, 23, 30], 'uncertain', '', 'treasureHunt')
+  ] }, { id: 'th-base', date: '2026-01-10' }, new Date('2026-01-10T12:00:00Z'), 'treasureHunt');
+  assert.match(formatSessionForMessage(treasure), /^Treasure Hunt slips/);
 });
 
 test('pending sessions return to the Ticket Builder while scored sessions are copied', () => {

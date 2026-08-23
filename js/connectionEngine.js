@@ -1,5 +1,5 @@
 /**
- * SVG annotation overlay for Cash 5 Studio.
+ * SVG annotation overlay for PA 5 Studio.
  * Supports chained line drawing, with Present-row endpoints completing a chain.
  */
 

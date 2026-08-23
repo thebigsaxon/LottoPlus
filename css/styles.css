@@ -56,7 +56,7 @@
   --cell-size: 42px;
   --cell-gap: 3px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --sans: "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif;
 }
 
 :root[data-theme="dark"] {
@@ -143,6 +143,10 @@ svg { display: block; }
 .brand-mark svg { width: 23px; height: 23px; }
 .brand-block h1 { font-size: 17px; line-height: 1.2; letter-spacing: -.015em; }
 .brand-block p { margin-top: 2px; color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.game-switch { height: 36px; display: inline-flex; align-items: stretch; flex: 0 0 auto; padding: 3px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--surface-soft); }
+.game-switch button { padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
+.game-switch button:hover { color: var(--ink); }
+.game-switch button.active { background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow); }
 .toolbar-actions, .surface-actions, .inline-actions { display: flex; align-items: center; gap: 8px; }
 .toolbar-btn, .btn, .text-btn, .icon-btn { border: 0; background: none; color: inherit; cursor: pointer; }
 .toolbar-btn, .btn { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
@@ -465,6 +469,7 @@ body.zoom-enlarged .evidence-layout { grid-template-columns: 1fr; }
 body.zoom-enlarged .slip-builder { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
 body.zoom-enlarged .future-map-inspector { max-height: 220px; }
 body.zoom-enlarged .toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+body.zoom-enlarged .app-toolbar { flex-wrap: wrap; }
 body.zoom-extra .slip-builder { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
 body.zoom-extra .app-toolbar { align-items: flex-start; padding-inline: 14px; }
 body.zoom-extra .brand-block p { white-space: normal; }
@@ -486,6 +491,7 @@ body.zoom-extra .brand-block p { white-space: normal; }
 @media (max-width: 980px) {
   .app-toolbar { align-items: flex-start; padding-inline: 16px; }
   .toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .app-toolbar { flex-wrap: wrap; }
   .primary-workspace, .motif-layout, .evidence-layout { grid-template-columns: 1fr; }
   .slip-builder { grid-template-columns: repeat(5, minmax(105px, 1fr)); }
   .brand-block p { white-space: normal; }

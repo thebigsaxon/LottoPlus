@@ -1,5 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
-  <circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3"/>
-  <path d="M16 19h16M16 29h16M19 16v16M29 16v16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-  <circle cx="24" cy="24" r="3" fill="currentColor"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
+  <rect x="42" y="42" width="940" height="940" rx="225" fill="#187458" stroke="#DCEDE7" stroke-width="28"/>
+  <circle cx="512" cy="512" r="305" fill="#F8F6EF"/>
+  <path d="M330 685V338h148c79 0 129 45 129 115 0 72-52 119-133 119h-65v113h-79Zm79-176h56c39 0 61-19 61-54 0-34-22-52-61-52h-56v106Z" fill="#187458"/>
+  <path d="M559 685 685 338h91l126 347h-84l-25-76H665l-25 76h-81Zm127-141h86l-43-132-43 132Z" fill="#187458"/>
+  <circle cx="760" cy="760" r="145" fill="#D5A63C" stroke="#F8F6EF" stroke-width="24"/>
+  <path d="M699 687h119v61h-62l-4 34c14-7 29-10 43-10 52 0 88 33 88 82 0 57-45 96-111 96-52 0-94-22-116-62l55-34c14 23 33 35 58 35 27 0 45-15 45-38 0-22-17-36-43-36-20 0-35 7-48 21l-43-16 19-133Z" fill="#163B31"/>
 </svg>

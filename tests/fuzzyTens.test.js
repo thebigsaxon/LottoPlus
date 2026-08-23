@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { recommendTensBands, tensDigitForNumber } from '../js/fuzzyTens.js';
+import { getTensBands, recommendTensBands, tensDigitForNumber } from '../js/fuzzyTens.js';
 
 test('fuzzy tens recommendations follow sorted-position history', () => {
   const draws = Array.from({ length: 10 }, (_, index) => ({
@@ -26,9 +26,14 @@ test('fuzzy tens recommendations use newer draws as stronger evidence', () => {
   assert.ok(ones.score > singles.score);
 });
 
-test('tens digit helper treats 1–9 and 40–42 as distinct bands', () => {
+test('tens bands follow each game maximum', () => {
   assert.equal(tensDigitForNumber(7), 0);
   assert.equal(tensDigitForNumber(19), 1);
   assert.equal(tensDigitForNumber(42), 4);
-  assert.equal(tensDigitForNumber(43), null);
+  assert.equal(tensDigitForNumber(43), 4);
+  assert.equal(tensDigitForNumber(44), null);
+  assert.equal(tensDigitForNumber(30, 'treasureHunt'), 3);
+  assert.equal(tensDigitForNumber(31, 'treasureHunt'), null);
+  assert.equal(getTensBands('cash5').at(-1).label, '40–43');
+  assert.equal(getTensBands('treasureHunt').at(-1).label, '30');
 });
