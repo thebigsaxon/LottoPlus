@@ -29,6 +29,7 @@ test('Cash 5 Studio shell exposes contextual pattern, annotation, and session su
   assert.match(html, /Build Your 5-Number Slip/);
   assert.match(html, /Optional research tool/);
   assert.match(html, /Map at least one digit on the Next Draw Board/);
+  assert.match(html, /Honorable mention/);
   assert.doesNotMatch(html, /Select at least one digit in each row/);
   assert.doesNotMatch(html, /Powerball|Mega Millions|game-tabs/);
 });
@@ -43,8 +44,11 @@ test('position highlighting, click-off Patterns, and native sharing are wired', 
   assert.match(appSource, /patternsPopover\.contains\(event\.target\)/);
   assert.match(appSource, /findBoardSimilarSequences\(this\.researchDraws/);
   assert.match(appSource, /buildNumberEvidence\(focusedMapping\.digit, this\.researchDraws/);
+  assert.match(appSource, /rankHistoricalSuccessors\(this\.researchDraws\)/);
+  assert.match(appSource, /successor-rank-/);
   assert.match(gridSource, /setPositionHighlights/);
   assert.match(gridSource, /position-highlighted/);
+  assert.match(gridSource, /position-highlight-double/);
   assert.match(webViewSource, /NSSharingServicePicker/);
   assert.match(webViewSource, /cash5StudioNativeShare/);
 });

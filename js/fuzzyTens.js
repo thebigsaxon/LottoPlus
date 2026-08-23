@@ -27,12 +27,51 @@ export function tensBandLabel(digit) {
   return TENS_BANDS.find(item => item.digit === Number(digit))?.label || 'Any tens';
 }
 
+function normalizePositionConstraints(values = []) {
+  return Array.from({ length: 5 }, (_, column) => {
+    const value = Array.isArray(values) ? values[column] : null;
+    return Number.isInteger(value) ? value : null;
+  });
+}
+
+function normalizeFixedNumbers(values = []) {
+  return Array.from({ length: 5 }, (_, column) => {
+    const value = Array.isArray(values) ? values[column] : null;
+    return Number.isInteger(value) && value >= 1 && value <= 42 ? value : null;
+  });
+}
+
+/** Returns whether at least one strictly increasing Cash 5 row satisfies the position constraints. */
+export function hasAvailableOrderedSlip({ mappedDigits = [], tensFilters = [], fixedNumbers = [] } = {}) {
+  const endings = normalizePositionConstraints(mappedDigits);
+  const bands = normalizePositionConstraints(tensFilters);
+  const fixed = normalizeFixedNumbers(fixedNumbers);
+  const canComplete = (column, previousNumber) => {
+    if (column === 5) return true;
+    const remainingPositions = 4 - column;
+    const maximum = 42 - remainingPositions;
+    const first = fixed[column] ?? previousNumber + 1;
+    const last = fixed[column] ?? maximum;
+    for (let number = first; number <= last; number += 1) {
+      if (number <= previousNumber || number > maximum) continue;
+      if (endings[column] !== null && number % 10 !== endings[column]) continue;
+      if (bands[column] !== null && tensDigitForNumber(number) !== bands[column]) continue;
+      if (canComplete(column + 1, number)) return true;
+    }
+    return false;
+  };
+  return canComplete(0, 0);
+}
+
 /** Ranks tens bands using fuzzy position, recency, and adjacent-position rules. */
-export function recommendTensBands(draws = []) {
+export function recommendTensBands(draws = [], constraints = {}) {
   const history = (draws || []).filter(draw => Array.isArray(draw?.numbers) && draw.numbers.length === 5);
   const drawCount = history.length;
   const recentWeights = history.map((_, index) => index + 1);
   const weightTotal = recentWeights.reduce((sum, value) => sum + value, 0) || 1;
+  const mappedDigits = normalizePositionConstraints(constraints.mappedDigits);
+  const activeTensFilters = normalizePositionConstraints(constraints.tensFilters);
+  const fixedNumbers = normalizeFixedNumbers(constraints.fixedNumbers);
 
   return Array.from({ length: 5 }, (_, column) => {
     const neighbors = [column - 1, column + 1].filter(index => index >= 0 && index < 5);
@@ -65,9 +104,20 @@ export function recommendTensBands(draws = []) {
       const reason = positionCount === 0
         ? 'not seen in this position'
         : `${positionCount} of ${drawCount} draws here${recentRate > positionRate + 0.08 ? ', stronger recently' : ''}`;
-      return { ...band, score, confidence, reason, positionCount, positionRate, recentRate, neighborRate };
-    }).sort((a, b) => b.score - a.score || b.recentRate - a.recentRate || b.positionRate - a.positionRate || a.digit - b.digit);
-    return { column, ranked, primary: ranked[0], alternate: ranked[1] };
+      const proposedTensFilters = [...activeTensFilters];
+      proposedTensFilters[column] = band.digit;
+      const proposedFixedNumbers = [...fixedNumbers];
+      proposedFixedNumbers[column] = null;
+      const available = hasAvailableOrderedSlip({
+        mappedDigits,
+        tensFilters: proposedTensFilters,
+        fixedNumbers: proposedFixedNumbers
+      });
+      return { ...band, score, confidence, reason, positionCount, positionRate, recentRate, neighborRate, available };
+    }).sort((a, b) => Number(b.available) - Number(a.available)
+      || b.score - a.score || b.recentRate - a.recentRate || b.positionRate - a.positionRate || a.digit - b.digit);
+    const availableBands = ranked.filter(band => band.available);
+    return { column, ranked, primary: availableBands[0] || ranked[0], alternate: availableBands[1] || null };
   });
 }
 

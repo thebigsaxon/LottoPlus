@@ -7,7 +7,7 @@ export class GridMatrix {
     this.container = tableContainerElement;
     this.draws = [];
     this.highlightedDigit = null;
-    this.positionHighlights = new Map();
+    this.positionHighlights = [];
     this.onCellClickCallback = null;
     this.options = { showTens: false, showOnes: true, selectedCellIds: [], rowRoles: {}, selectableContextRows: false };
   }
@@ -24,7 +24,10 @@ export class GridMatrix {
   }
 
   setPositionHighlights(selections = []) {
-    this.positionHighlights = new Map((selections || []).map(item => [Number(item.column), Number(item.digit)]));
+    this.positionHighlights = (selections || [])
+      .map(item => ({ column: Number(item.column), digit: Number(item.digit) }))
+      .filter(item => Number.isInteger(item.column) && item.column >= 0 && item.column <= 4
+        && Number.isInteger(item.digit) && item.digit >= 0 && item.digit <= 9);
     this.updateHighlights();
   }
 
@@ -91,10 +94,24 @@ export class GridMatrix {
     this.container.querySelectorAll('.square-cell').forEach(cell => {
       cell.classList.toggle('highlighted', this.highlightedDigit !== null && Number(cell.dataset.digit) === this.highlightedDigit);
       for (let position = 1; position <= 5; position += 1) cell.classList.remove(`position-${position}`);
-      cell.classList.remove('position-highlighted');
-      const column = Number(cell.dataset.column);
-      if (cell.classList.contains('ones') && this.positionHighlights.get(column) === Number(cell.dataset.digit)) {
-        cell.classList.add('position-highlighted', `position-${column + 1}`);
+      cell.classList.remove('position-highlighted', 'position-highlight-single', 'position-highlight-double');
+      cell.style.removeProperty('--position-highlight-primary');
+      cell.style.removeProperty('--position-highlight-secondary');
+      delete cell.dataset.highlightCount;
+      if (!cell.classList.contains('ones')) return;
+
+      const matchingPositions = this.positionHighlights
+        .filter(item => item.digit === Number(cell.dataset.digit))
+        .map(item => item.column + 1)
+        .sort((a, b) => a - b);
+      if (!matchingPositions.length) return;
+
+      matchingPositions.forEach(position => cell.classList.add(`position-${position}`));
+      cell.classList.add('position-highlighted', matchingPositions.length === 1 ? 'position-highlight-single' : 'position-highlight-double');
+      cell.dataset.highlightCount = String(matchingPositions.length);
+      if (matchingPositions.length > 1) {
+        cell.style.setProperty('--position-highlight-primary', `var(--pos-${matchingPositions[0]}-border)`);
+        cell.style.setProperty('--position-highlight-secondary', `var(--pos-${matchingPositions[1]}-border)`);
       }
     });
   }

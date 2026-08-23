@@ -4,7 +4,7 @@ import { SAMPLE_CASH_5 } from './sampleData.js?v=3';
 import { parseCSV, autoMapColumns, convertRowsToDraws } from './csvParser.js';
 import { generateAutomatedPatterns } from './patternEngine.js';
 import { ConnectionEngine, normalizeManualConnectionChains } from './connectionEngine.js?v=5';
-import { GridMatrix } from './gridMatrix.js?v=5';
+import { GridMatrix } from './gridMatrix.js?v=6';
 import { fetchLiveCash5Update } from './liveFetcher.js?v=4';
 import { validateProject, validateDraw, escapeHTML } from './validation.js?v=3';
 import { cash5AnalysisWindow, cash5ResearchWindow } from './drawFilters.js?v=2';
@@ -12,14 +12,15 @@ import { findBoardSimilarSequences } from './motifEngine.js?v=4';
 import { buildNumberEvidence } from './evidenceEngine.js';
 import { classifyOnesHeat } from './onesAnalysis.js';
 import { createDraftRow, editSessionInBuilder, finalizeSession, formatSessionForMessage, scorePendingSessions } from './sessionStore.js?v=5';
-import { futureCellEvidence, selectFutureDigit } from './futureWorkspace.js?v=2';
+import { futureCellEvidence, rankHistoricalSuccessors, selectFutureDigit } from './futureWorkspace.js?v=4';
 import { buildDigitRepeatSummary } from './repeatSummary.js';
-import { recommendTensBands, TENS_BANDS, tensDigitForNumber } from './fuzzyTens.js';
+import { hasAvailableOrderedSlip, recommendTensBands, TENS_BANDS, tensDigitForNumber } from './fuzzyTens.js?v=3';
 
 const INTERFACE_ZOOM_STEPS = [0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
 const INTERFACE_ZOOM_KEY = 'cash5studio_interface_zoom';
 const THEME_KEY = 'cash5studio_theme';
 const JACKPOT_KEY = 'cash5studio_last_jackpot';
+const SUCCESSOR_RANK_LABELS = ['Top historical successor', 'Second historical successor', 'Third historical successor', 'Honorable mention'];
 
 function cash5NumberMarkup(number) {
   if (number === null || number === undefined || !Number.isInteger(Number(number))) return '<span class="number-empty">?</span>';
@@ -704,6 +705,10 @@ export class Cash5StudioApp {
 
     const selections = this.workspace.futureDigitMap || [];
     const mappedKeys = new Set((this.workspace.futureDigitMap || []).map(item => `${item.column}:${item.digit}`));
+    const successorRankings = rankHistoricalSuccessors(this.researchDraws);
+    const successorCandidates = new Map(successorRankings.flatMap(result => (
+      result.candidates.map(candidate => [`${result.column}:${candidate.digit}`, { ...candidate, result }])
+    )));
     this.gridMatrix?.setPositionHighlights(selections);
 
     if (this.futureDigitGrid) {
@@ -716,9 +721,15 @@ export class Cash5StudioApp {
             const key = `${column}:${digit}`;
             const mapped = mappedKeys.has(key);
             const active = this.workspace.activeFutureCell?.column === column && this.workspace.activeFutureCell?.digit === digit;
-            return `<button class="future-map-cell ${mapped ? `mapped position-${column + 1}` : ''} ${active ? 'active' : ''}"
+            const successor = successorCandidates.get(key);
+            const rankClass = successor ? `successor-rank-${successor.rank}` : '';
+            const rankTitle = successor
+              ? `${SUCCESSOR_RANK_LABELS[successor.rank - 1]}: digit ${digit} followed present digit ${successor.result.presentDigit} in Ball ${column + 1} in ${successor.count} of ${successor.result.totalTransitions} matching transitions. Most recent transition: ${successor.mostRecentTransitionDate}.`
+              : '';
+            return `<button class="future-map-cell ${rankClass} ${mapped ? `mapped position-${column + 1}` : ''} ${active ? 'active' : ''}"
               data-future-column="${column}" data-future-digit="${digit}" aria-pressed="${mapped}"
-              aria-label="Select ones digit ${digit} in Ball ${column + 1}">
+              ${rankTitle ? `title="${escapeHTML(rankTitle)}"` : ''}
+              aria-label="${escapeHTML(`Select ones digit ${digit} in Ball ${column + 1}.${rankTitle ? ` ${rankTitle}` : ''}`)}">
               <b>${digit}</b>
             </button>`;
           }).join('')}`).join('')}`;
@@ -727,9 +738,12 @@ export class Cash5StudioApp {
         button.addEventListener('click', () => {
           const column = Number(button.dataset.futureColumn);
           const digit = Number(button.dataset.futureDigit);
+          const wasMapped = this.workspace.futureDigitMap.some(item => item.column === column && item.digit === digit);
           this.workspace.futureDigitMap = selectFutureDigit(this.workspace.futureDigitMap, column, digit);
           this.workspace.motifMatches = [];
-          this.workspace.activeFutureCell = { column, digit };
+          this.workspace.activeFutureCell = wasMapped
+            ? (this.workspace.futureDigitMap[0] ? { ...this.workspace.futureDigitMap[0] } : null)
+            : { column, digit };
           this.gridMatrix?.setPositionHighlights(this.workspace.futureDigitMap);
           this.renderCash5Workspace();
           this.saveToLocalStorage();
@@ -745,6 +759,11 @@ export class Cash5StudioApp {
       } else {
         const evidence = futureCellEvidence(this.researchDraws, this.workspace.motifMatches, active.column, active.digit);
         const isMapped = mappedKeys.has(`${active.column}:${active.digit}`);
+        const successor = successorCandidates.get(`${active.column}:${active.digit}`);
+        const successorResult = successorRankings.find(result => result.column === active.column);
+        const successorDetail = successor
+          ? `<span class="successor-inspector-rank rank-${successor.rank}"><b>${successor.rank === 4 ? 'HM' : `#${successor.rank}`}</b> ${SUCCESSOR_RANK_LABELS[successor.rank - 1]}<br><small>${successor.count} of ${successorResult.totalTransitions} matching transitions · latest ${escapeHTML(successor.mostRecentTransitionDate)}</small></span>`
+          : `<span><b>—</b> successor rank<br><small>${successorResult?.totalTransitions || 0} matching transitions</small></span>`;
         this.futureMapInspector.innerHTML = `
           <div class="future-inspector-head">
             <div><span>Focused selection</span><h4>Digit ${active.digit} in Ball ${active.column + 1}</h4></div>
@@ -753,6 +772,7 @@ export class Cash5StudioApp {
           <div class="future-inspector-stats">
             <span><b>${evidence.windowCount}</b> times in this space<br><small>${this.researchDraws.length} research draws</small></span>
             <span><b>${evidence.motifCount}</b> pattern futures<br><small>after motif search</small></span>
+            ${successorDetail}
           </div>
           <details open class="future-evidence-expander">
             <summary>Full numbers ending in ${active.digit}</summary>
@@ -872,9 +892,14 @@ export class Cash5StudioApp {
       this.workspace.slipTensFilters = [null, null, null, null, null];
     }
     const tensFilters = this.workspace.slipTensFilters;
-    const tensRecommendations = recommendTensBands(this.filteredDraws);
     const filledNumbers = slip.filter(Number.isInteger);
     const mappedDigitByColumn = new Map((this.workspace.futureDigitMap || []).map(item => [item.column, item.digit]));
+    const mappedDigitsByPosition = Array.from({ length: 5 }, (_, column) => mappedDigitByColumn.get(column) ?? null);
+    const tensRecommendations = recommendTensBands(this.filteredDraws, {
+      mappedDigits: mappedDigitsByPosition,
+      tensFilters,
+      fixedNumbers: slip
+    });
     const isComplete = filledNumbers.length === 5
       && new Set(filledNumbers).size === 5
       && filledNumbers.every((number, index) => index === 0 || number > filledNumbers[index - 1])
@@ -896,12 +921,22 @@ export class Cash5StudioApp {
           .sort((a, b) => a - b);
         const tensFilter = Number.isInteger(tensFilters[index]) ? tensFilters[index] : null;
         const recommendation = tensRecommendations[index];
+        const recommendationAvailable = Boolean(recommendation.primary?.available);
         const minimum = Number.isInteger(previous) ? previous + (index - previousIndex) : index + 1;
         const maximum = Number.isInteger(next) ? next - (nextIndex - index) : 42 - (4 - index);
         const available = Array.from({ length: 42 }, (_, numberIndex) => numberIndex + 1)
           .filter(number => number >= minimum && number <= maximum)
           .filter(number => mappedDigits.length === 0 || mappedDigits.includes(number % 10))
-          .filter(number => tensFilter === null || tensDigitForNumber(number) === tensFilter);
+          .filter(number => tensFilter === null || tensDigitForNumber(number) === tensFilter)
+          .filter(number => {
+            const proposedNumbers = [...slip];
+            proposedNumbers[index] = number;
+            return hasAvailableOrderedSlip({
+              mappedDigits: mappedDigitsByPosition,
+              tensFilters,
+              fixedNumbers: proposedNumbers
+            });
+          });
         const currentMatchesMap = !Number.isInteger(current) || mappedDigits.length === 0 || mappedDigits.includes(current % 10);
         const currentMatchesTens = !Number.isInteger(current) || tensFilter === null || tensDigitForNumber(current) === tensFilter;
         const currentIsUnique = !Number.isInteger(current) || slip.filter(number => number === current).length === 1;
@@ -919,13 +954,19 @@ export class Cash5StudioApp {
         return `<div class="slip-slot ${Number.isInteger(current) ? 'filled' : ''} ${currentIsValid ? '' : 'invalid'}">
           <span class="slip-slot-head"><strong>Ball ${index + 1}</strong>${mappedDigits.length ? `<span class="mapped-ending position-${index + 1}"><small>Mapped ending</small><b>${mappedDigits[0]}</b></span>` : '<span class="no-mapped-ending">No digit filter</span>'}</span>
           <div class="fuzzy-recommendation">
-            <span><b>${recommendation.primary.label}</b><small>${recommendation.primary.confidence} · ${recommendation.primary.reason}</small></span>
-            <button type="button" data-use-tens="${recommendation.primary.digit}" data-tens-position="${index}" aria-label="Use ${recommendation.primary.label} recommendation for Ball ${index + 1}" aria-pressed="${tensFilter === recommendation.primary.digit}">${tensFilter === recommendation.primary.digit ? 'Using' : 'Use'}</button>
+            <span><b>${recommendationAvailable ? recommendation.primary.label : 'No available tens range'}</b><small>${recommendationAvailable ? `${recommendation.primary.confidence} · ${recommendation.primary.reason}` : 'Change another Ball filter or mapped ending'}</small></span>
+            <button type="button" data-use-tens="${recommendation.primary.digit}" data-tens-position="${index}" aria-label="Use ${recommendation.primary.label} recommendation for Ball ${index + 1}" aria-pressed="${tensFilter === recommendation.primary.digit}" ${recommendationAvailable ? '' : 'disabled'}>${tensFilter === recommendation.primary.digit ? 'Using' : 'Use'}</button>
           </div>
           <label class="slip-field-label">Tens range
             <select class="tens-filter-select" data-slip-tens="${index}" aria-label="Tens range for Ball ${index + 1}">
               <option value="">Any tens</option>
-              ${TENS_BANDS.map(band => `<option value="${band.digit}" ${band.digit === tensFilter ? 'selected' : ''}>${band.label}${band.digit === recommendation.primary.digit ? ` — ${recommendation.primary.confidence}` : band.digit === recommendation.alternate.digit ? ' — Alternate' : ''}</option>`).join('')}
+              ${TENS_BANDS.map(band => {
+                const rankedBand = recommendation.ranked.find(item => item.digit === band.digit);
+                const unavailable = !rankedBand?.available;
+                const suffix = unavailable ? ' — Unavailable' : band.digit === recommendation.primary.digit
+                  ? ` — ${recommendation.primary.confidence}` : band.digit === recommendation.alternate?.digit ? ' — Alternate' : '';
+                return `<option value="${band.digit}" ${band.digit === tensFilter ? 'selected' : ''} ${unavailable ? 'disabled' : ''}>${band.label}${suffix}</option>`;
+              }).join('')}
             </select>
           </label>
           <label class="slip-field-label">Full number
@@ -934,7 +975,7 @@ export class Cash5StudioApp {
             ${options.map(number => `<option value="${number}" ${number === current ? 'selected' : ''}>${number}</option>`).join('')}
           </select>
           </label>
-          <small>${currentIsValid ? `${helper}${tensFilter === null ? '' : ` in ${TENS_BANDS.find(band => band.digit === tensFilter)?.label}`}. Alternate: ${recommendation.alternate.label}.` : invalidMessage}</small>
+          <small>${currentIsValid ? `${helper}${tensFilter === null ? '' : ` in ${TENS_BANDS.find(band => band.digit === tensFilter)?.label}`}.${recommendation.alternate ? ` Alternate: ${recommendation.alternate.label}.` : ''}` : invalidMessage}</small>
         </div>`;
       }).join('');
 

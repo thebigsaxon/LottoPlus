@@ -9,9 +9,9 @@ The toolbar includes persistent low-glare Light and Dark themes. **Update Draws*
 ## Workflow
 
 1. Review the latest ten drawings and optional relationship overlays in **Draw History**.
-2. Map one ones digit per position on the **Next Draw Board**; matching history cells retain a distinct color for each Ball column.
+2. Review the **Next Draw Board**, where each Ball column ranks the ones digits that historically followed its latest digit across up to 50 draws (#1 blue, #2 red, #3 green, honorable mention yellow), then toggle one digit per position for your own selection. Each mapped digit highlights all of its occurrences in Draw History; mapping the same digit twice adds concentric Ball-color rings.
 3. Use **Study Similar Sequences** or **Inspect Number Evidence** across the latest 50 loaded drawings for context, then place useful full numbers directly into their corresponding slip positions.
-4. Build and save one or more five-number rows from the position-aware menus; mapped digits automatically filter each Ball.
+4. Build and save one or more five-number rows from the position-aware menus; mapped digits automatically filter each Ball, while unavailable tens bands and full numbers are removed when they cannot complete an increasing row within 1–42.
 5. Finalize the saved rows for the next drawing, then copy them in an iMessage-ready format or open the native macOS share sheet. Locked sessions remain visible and can return to Ticket Builder for editing.
 
 Pattern overlays support adjacent matches, same-column runs, one-column sister shifts, and three-draw mathematical sequences. Manual line and arrow annotations are available from the contextual **Annotate** toolbar.

@@ -15,7 +15,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=9">
+  <link rel="stylesheet" href="css/styles.css?v=11">
 </head>
 <body>
   <header class="app-toolbar">
@@ -122,7 +122,7 @@
             <div id="gridContainer"></div>
           </div>
         </div>
-        <p class="matrix-hint">Use Patterns to reveal historical relationships or Annotate to add your own notes. Similar-sequence research starts from the Next Draw Board.</p>
+        <p class="matrix-hint">Mapped Next Draw digits highlight every matching ones digit here; two mapped positions use concentric Ball-color rings. Use Patterns to reveal other relationships or Annotate to add your own notes.</p>
       </article>
 
       <article class="surface next-board-surface future-map-card" id="futureMapCard">
@@ -130,8 +130,14 @@
           <div><span class="eyebrow">Plan by position</span><h2>Next Draw Board</h2></div>
           <div class="surface-actions"><button class="text-btn" id="btnClearFutureMap" type="button">Clear board</button><button class="btn btn-secondary" id="btnJumpToSlip" type="button">Build slip ↓</button></div>
         </header>
-        <p class="surface-intro">Map any ones digit to one or more ball positions. Historical context remains secondary to your selections.</p>
-          <div class="future-map-legend" aria-label="Next draw board legend"><span><i class="intuition"></i>Mapped by Ball position</span></div>
+        <p class="surface-intro">The latest 50 draws rank which ones digits historically followed the present digit in each Ball position. Map any digit to keep building your own selection.</p>
+          <div class="future-map-legend" aria-label="Next draw board legend">
+            <span><i class="intuition"></i>Mapped selection</span>
+            <span><i class="successor-rank-1"></i>#1</span>
+            <span><i class="successor-rank-2"></i>#2</span>
+            <span><i class="successor-rank-3"></i>#3</span>
+            <span><i class="successor-rank-4"></i>Honorable mention</span>
+          </div>
         <div id="futureDigitGrid" class="future-digit-grid"></div>
         <div id="futureMapInspector" class="future-map-inspector empty-state">Choose a digit and position to inspect its recent context.</div>
       </article>
@@ -173,7 +179,7 @@
           <div><span class="eyebrow">Your next step</span><h2>Build Your 5-Number Slip</h2></div>
           <div class="slip-progress" id="slipProgress">0 of 5 selected</div>
         </header>
-        <p class="slip-intro">For each ball, review the fuzzy tens recommendation, optionally apply it, then choose a full number. Recommendations blend position frequency, recency, and neighboring-position history; they describe the latest 10 draws and do not predict the next one.</p>
+        <p class="slip-intro">For each ball, review the fuzzy tens recommendation, optionally apply it, then choose a full number. Unavailable ranges are disabled when mapped endings, chosen numbers, or the 1–42 limit would prevent an increasing five-number row. Recommendations blend position frequency, recency, and neighboring-position history; they describe the latest 10 draws and do not predict the next one.</p>
         <div class="slip-builder" id="rowBuilder"></div>
         <div class="slip-action-bar">
           <p id="slipGuidance">Start with any ball position. You can change every choice before adding the row.</p>
@@ -200,6 +206,6 @@
   </aside>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  <script type="module" src="js/app.js?v=13"></script>
+  <script type="module" src="js/app.js?v=17"></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ import {
   buildFutureWorkspaceModel,
   futureCellEvidence,
   normalizeFutureDigitMap,
+  rankHistoricalSuccessors,
   selectFutureDigit
 } from '../js/futureWorkspace.js';
 
@@ -50,10 +51,10 @@ test('motif future numbers remain aligned to their original ball columns', () =>
   ]);
 });
 
-test('future digit map keeps exactly one idempotent selection per column', () => {
+test('future digit map keeps one selection per column and toggles the active digit off', () => {
   const mapped = selectFutureDigit([], 2, 5);
   assert.deepEqual(mapped, [{ column: 2, digit: 5 }]);
-  assert.deepEqual(selectFutureDigit(mapped, 2, 5), mapped);
+  assert.deepEqual(selectFutureDigit(mapped, 2, 5), []);
   assert.deepEqual(selectFutureDigit(mapped, 2, 7), [{ column: 2, digit: 7 }]);
   assert.deepEqual(normalizeFutureDigitMap([
     { column: 2, digit: 5 }, { column: 2, digit: 7 }, { column: 8, digit: 2 }
@@ -74,4 +75,76 @@ test('future cell evidence stays scoped to the selected space', () => {
   assert.equal(evidence.windowCount, 2);
   assert.equal(evidence.motifCount, 1);
   assert.deepEqual(evidence.fullNumbers.find(item => item.number === 25), { number: 25, spaceCount: 2 });
+});
+
+test('historical successors use same-column ones-digit transitions and rank by frequency', () => {
+  const history = [
+    { date: '2026-01-01', numbers: [5, 11, 22, 33, 40] },
+    { date: '2026-01-02', numbers: [21, 15, 23, 34, 41] },
+    { date: '2026-01-03', numbers: [15, 16, 24, 35, 42] },
+    { date: '2026-01-04', numbers: [22, 17, 25, 36, 40] },
+    { date: '2026-01-05', numbers: [35, 18, 26, 37, 41] },
+    { date: '2026-01-06', numbers: [11, 19, 27, 38, 42] },
+    { date: '2026-01-07', numbers: [25, 20, 28, 39, 40] }
+  ];
+
+  const firstBall = rankHistoricalSuccessors([...history].reverse())[0];
+  assert.equal(firstBall.presentNumber, 25);
+  assert.equal(firstBall.presentDigit, 5);
+  assert.equal(firstBall.totalTransitions, 3);
+  assert.deepEqual(firstBall.candidates, [
+    { digit: 1, rank: 1, count: 2, mostRecentTransitionDate: '2026-01-06' },
+    { digit: 2, rank: 2, count: 1, mostRecentTransitionDate: '2026-01-04' }
+  ]);
+});
+
+test('historical successor ties prefer recent transitions and then lower digits', () => {
+  const history = [
+    { date: '2026-01-01', numbers: [5, 11, 21, 31, 40] },
+    { date: '2026-01-02', numbers: [13, 12, 22, 32, 41] },
+    { date: '2026-01-03', numbers: [15, 13, 23, 33, 42] },
+    { date: '2026-01-04', numbers: [12, 14, 24, 34, 40] },
+    { date: '2026-01-05', numbers: [25, 15, 25, 35, 41] }
+  ];
+  const firstBall = rankHistoricalSuccessors(history)[0];
+  assert.deepEqual(firstBall.candidates.map(item => item.digit), [2, 3]);
+
+  const sameDateHistory = [
+    { date: '2026-01-01', numbers: [5, 11, 21, 31, 40] },
+    { date: '2026-01-02', numbers: [13, 12, 22, 32, 41] },
+    { date: '2026-01-02', numbers: [15, 13, 23, 33, 42] },
+    { date: '2026-01-02', numbers: [12, 14, 24, 34, 40] },
+    { date: '2026-01-03', numbers: [25, 15, 25, 35, 41] }
+  ];
+  assert.deepEqual(rankHistoricalSuccessors(sameDateHistory)[0].candidates.map(item => item.digit), [2, 3]);
+});
+
+test('historical successors limit analysis to the newest 50 valid draws', () => {
+  const history = Array.from({ length: 52 }, (_, index) => ({
+    date: `2026-02-${String(index + 1).padStart(2, '0')}`,
+    numbers: [1, 12, 23, 34, 40]
+  }));
+  history[0].numbers[0] = 9;
+  history[1].numbers[0] = 8;
+  history[2].numbers[0] = 19;
+  history[3].numbers[0] = 7;
+  history[51].numbers[0] = 29;
+  history.push({ date: 'not-valid-numbers', numbers: [0, 12, 23, 34, 40] });
+
+  const firstBall = rankHistoricalSuccessors(history)[0];
+  assert.equal(firstBall.totalTransitions, 1);
+  assert.deepEqual(firstBall.candidates.map(item => item.digit), [7]);
+});
+
+test('historical successors return only supported candidates for sparse data', () => {
+  assert.deepEqual(rankHistoricalSuccessors([]), []);
+  const results = rankHistoricalSuccessors([
+    { date: '2026-01-01', numbers: [1, 12, 23, 34, 40] }
+  ]);
+  assert.equal(results.length, 5);
+  results.forEach((result, column) => {
+    assert.equal(result.column, column);
+    assert.equal(result.totalTransitions, 0);
+    assert.deepEqual(result.candidates, []);
+  });
 });

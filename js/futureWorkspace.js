@@ -1,5 +1,68 @@
 import { onesDigit } from './onesAnalysis.js';
 
+/**
+ * Rank the ones digits that historically followed the latest digit in each
+ * Cash 5 ball position. Results are derived exclusively from the newest 50
+ * valid chronological draws, leaving the latest draw out as a predecessor
+ * because its successor is not known yet.
+ */
+export function rankHistoricalSuccessors(draws = []) {
+  const chronological = (Array.isArray(draws) ? draws : [])
+    .filter(draw => (
+      typeof draw?.date === 'string'
+      && draw.date.length > 0
+      && Array.isArray(draw.numbers)
+      && draw.numbers.length === 5
+      && draw.numbers.every(number => Number.isInteger(Number(number)) && Number(number) >= 1 && Number(number) <= 42)
+    ))
+    .map(draw => ({ ...draw, numbers: draw.numbers.map(Number) }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-50);
+
+  const presentDraw = chronological.at(-1);
+  if (!presentDraw) return [];
+
+  return Array.from({ length: 5 }, (_, column) => {
+    const presentNumber = presentDraw.numbers[column];
+    const presentDigit = onesDigit(presentNumber);
+    const counts = new Map();
+    let totalTransitions = 0;
+
+    for (let index = 0; index < chronological.length - 1; index += 1) {
+      if (onesDigit(chronological[index].numbers[column]) !== presentDigit) continue;
+      const successor = chronological[index + 1];
+      const digit = onesDigit(successor.numbers[column]);
+      const current = counts.get(digit) || { digit, count: 0, mostRecentTransitionDate: '' };
+      current.count += 1;
+      current.mostRecentTransitionDate = successor.date;
+      counts.set(digit, current);
+      totalTransitions += 1;
+    }
+
+    const candidates = [...counts.values()]
+      .sort((a, b) => (
+        b.count - a.count
+        || b.mostRecentTransitionDate.localeCompare(a.mostRecentTransitionDate)
+        || a.digit - b.digit
+      ))
+      .slice(0, 4)
+      .map(({ digit, count, mostRecentTransitionDate }, index) => ({
+        digit,
+        rank: index + 1,
+        count,
+        mostRecentTransitionDate
+      }));
+
+    return {
+      column,
+      presentNumber,
+      presentDigit,
+      totalTransitions,
+      candidates
+    };
+  });
+}
+
 export function normalizeFutureDigitMap(values = [], activeCell = null) {
   const byColumn = new Map();
   (values || []).forEach(item => {
@@ -27,6 +90,9 @@ export function selectFutureDigit(values, column, digit) {
   const selectedDigit = Number(digit);
   if (!Number.isInteger(selectedColumn) || selectedColumn < 0 || selectedColumn > 4
       || !Number.isInteger(selectedDigit) || selectedDigit < 0 || selectedDigit > 9) return normalized;
+  if (normalized.some(item => item.column === selectedColumn && item.digit === selectedDigit)) {
+    return normalized.filter(item => item.column !== selectedColumn);
+  }
   return normalizeFutureDigitMap([
     ...normalized.filter(item => item.column !== selectedColumn),
     { column: selectedColumn, digit: selectedDigit }
