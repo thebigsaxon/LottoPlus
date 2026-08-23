@@ -1,31 +1,4 @@
-/**
- * Built-in Sample Datasets for Powerball, Mega Millions, and Cash 5
- */
-
-export const SAMPLE_POWERBALL = [
-  { id: "pb-1", date: "2026-08-03", numbers: [3, 14, 28, 44, 59], bonus: 12, multiplier: 3 },
-  { id: "pb-2", date: "2026-08-01", numbers: [7, 19, 32, 41, 68], bonus: 4, multiplier: 2 },
-  { id: "pb-3", date: "2026-07-29", numbers: [1, 24, 32, 44, 60], bonus: 18, multiplier: 4 },
-  { id: "pb-4", date: "2026-07-27", numbers: [12, 26, 35, 51, 62], bonus: 9, multiplier: 2 },
-  { id: "pb-5", date: "2026-07-25", numbers: [5, 18, 29, 44, 53], bonus: 24, multiplier: 3 },
-  { id: "pb-6", date: "2026-07-22", numbers: [8, 22, 34, 49, 65], bonus: 15, multiplier: 5 },
-  { id: "pb-7", date: "2026-07-20", numbers: [2, 14, 30, 42, 57], bonus: 7, multiplier: 2 },
-  { id: "pb-8", date: "2026-07-18", numbers: [9, 21, 38, 47, 61], bonus: 11, multiplier: 3 },
-  { id: "pb-9", date: "2026-07-15", numbers: [4, 16, 27, 40, 58], bonus: 22, multiplier: 2 },
-  { id: "pb-10", date: "2026-07-13", numbers: [11, 25, 33, 46, 69], bonus: 1, multiplier: 4 }
-];
-
-export const SAMPLE_MEGA_MILLIONS = [
-  { id: "mm-1", date: "2026-08-04", numbers: [10, 24, 38, 45, 62], bonus: 14, multiplier: 3 },
-  { id: "mm-2", date: "2026-07-31", numbers: [4, 18, 29, 52, 69], bonus: 8, multiplier: 4 },
-  { id: "mm-3", date: "2026-07-28", numbers: [15, 27, 34, 48, 70], bonus: 21, multiplier: 2 },
-  { id: "mm-4", date: "2026-07-24", numbers: [2, 11, 36, 43, 58], bonus: 5, multiplier: 3 },
-  { id: "mm-5", date: "2026-07-21", numbers: [9, 20, 31, 49, 66], bonus: 17, multiplier: 5 },
-  { id: "mm-6", date: "2026-07-17", numbers: [6, 14, 25, 41, 63], bonus: 12, multiplier: 2 },
-  { id: "mm-7", date: "2026-07-14", numbers: [1, 23, 39, 50, 67], bonus: 25, multiplier: 3 },
-  { id: "mm-8", date: "2026-07-10", numbers: [13, 22, 35, 47, 61], bonus: 9, multiplier: 4 }
-];
-
+/** Built-in SC Palmetto Cash 5 sample drawings. */
 export const SAMPLE_CASH_5 = [
   { id: "c5-1", date: "2026-08-04", numbers: [1, 5, 6, 11, 39] },
   { id: "c5-2", date: "2026-08-03", numbers: [11, 23, 25, 37, 42] },
@@ -46,5 +19,20 @@ export const SAMPLE_CASH_5 = [
   { id: "c5-17", date: "2026-07-19", numbers: [14, 15, 26, 33, 36] },
   { id: "c5-18", date: "2026-07-18", numbers: [10, 22, 24, 29, 32] },
   { id: "c5-19", date: "2026-07-17", numbers: [7, 8, 11, 14, 42] },
-  { id: "c5-20", date: "2026-07-16", numbers: [6, 21, 24, 38, 40] }
+  { id: "c5-20", date: "2026-07-16", numbers: [6, 21, 24, 38, 40] },
+  { id: "c5-21", date: "2026-07-15", numbers: [1, 4, 17, 34, 41] },
+  { id: "c5-22", date: "2026-07-14", numbers: [7, 8, 33, 35, 41] },
+  { id: "c5-23", date: "2026-07-13", numbers: [1, 14, 27, 37, 39] },
+  { id: "c5-24", date: "2026-07-12", numbers: [8, 9, 22, 26, 37] },
+  { id: "c5-25", date: "2026-07-11", numbers: [11, 17, 25, 28, 38] },
+  { id: "c5-26", date: "2026-07-10", numbers: [3, 15, 23, 35, 39] },
+  { id: "c5-27", date: "2026-07-09", numbers: [5, 11, 23, 25, 39] },
+  { id: "c5-28", date: "2026-07-08", numbers: [3, 18, 25, 35, 41] },
+  { id: "c5-29", date: "2026-07-07", numbers: [7, 14, 15, 18, 19] },
+  { id: "c5-30", date: "2026-07-06", numbers: [1, 11, 33, 35, 41] },
+  { id: "c5-31", date: "2026-07-05", numbers: [8, 20, 30, 37, 38] },
+  { id: "c5-32", date: "2026-07-04", numbers: [14, 17, 24, 31, 39] },
+  { id: "c5-33", date: "2026-07-03", numbers: [9, 13, 14, 25, 42] },
+  { id: "c5-34", date: "2026-07-02", numbers: [2, 6, 7, 13, 15] },
+  { id: "c5-35", date: "2026-07-01", numbers: [2, 22, 31, 37, 42] }
 ];

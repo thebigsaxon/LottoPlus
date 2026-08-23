@@ -2,22 +2,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "LottoPlus",
+    name: "Cash5Studio",
     platforms: [
         .macOS(.v13)
     ],
     products: [
         .executable(
-            name: "LottoPlus",
-            targets: ["LottoPlus"]
+            name: "Cash5Studio",
+            targets: ["Cash5Studio"]
         )
     ],
     targets: [
         .executableTarget(
-            name: "LottoPlus",
+            name: "Cash5Studio",
             path: "LottoPlusApp",
             resources: [
-                .copy("../index.html")
+                .copy("../index.html"),
+                .copy("../css"),
+                .copy("../js")
             ]
         )
     ]

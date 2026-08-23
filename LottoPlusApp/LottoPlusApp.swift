@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct LottoPlusApp: App {
+struct Cash5StudioApp: App {
     @State private var triggerAction: String? = nil
 
     var body: some Scene {
@@ -28,23 +28,21 @@ struct LottoPlusApp: App {
                 }
                 .keyboardShortcut("s", modifiers: [.command])
             }
-
-            // Custom Game Switcher Menu
-            CommandMenu("Game") {
-                Button("Powerball (5 + 1)") {
-                    triggerAction = "gamePowerball"
+            CommandMenu("Zoom") {
+                Button("Zoom In") {
+                    triggerAction = "zoomIn"
                 }
-                .keyboardShortcut("1", modifiers: [.command])
+                .keyboardShortcut("+", modifiers: [.command])
 
-                Button("Mega Millions (5 + 1)") {
-                    triggerAction = "gameMegaMillions"
+                Button("Zoom Out") {
+                    triggerAction = "zoomOut"
                 }
-                .keyboardShortcut("2", modifiers: [.command])
+                .keyboardShortcut("-", modifiers: [.command])
 
-                Button("Cash 5 (5 Balls)") {
-                    triggerAction = "gameCash5"
+                Button("Actual Size") {
+                    triggerAction = "zoomReset"
                 }
-                .keyboardShortcut("3", modifiers: [.command])
+                .keyboardShortcut("0", modifiers: [.command])
             }
         }
     }

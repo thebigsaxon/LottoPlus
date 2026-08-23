@@ -1,0 +1,20 @@
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Swift Build & Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Application Release Packages & Distributables
+dist/
+
+# Node.js Dependencies & Coverage
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/

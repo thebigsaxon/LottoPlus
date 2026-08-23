@@ -1,18 +1,18 @@
-/**
- * CSV Import & Export Utilities for LottoPlus
- */
+/** Flexible CSV importer for SC Palmetto Cash 5 exports. */
+
+import { validateDraw } from './validation.js';
 
 export function parseCSV(csvText) {
   const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length === 0) return { headers: [], rows: [] };
 
+  // Detect header separator
   const firstLine = lines[0];
   let sep = ',';
   if (firstLine.includes('\t')) sep = '\t';
   else if (firstLine.includes(';')) sep = ';';
 
   const rows = lines.map(line => {
-    // Regex matching CSV values handling quotes
     const regex = new RegExp(`(?:^|${sep})(?:"([^"]*)"|([^"${sep}]*))`, 'g');
     const matches = [];
     let match;
@@ -23,7 +23,16 @@ export function parseCSV(csvText) {
     return matches;
   });
 
-  return { headers: rows[0], rows: rows.slice(1) };
+  // Filter out duplicate header lines inside multi-game concatenated CSV files
+  const header = rows[0];
+  const dataRows = rows.slice(1).filter(r => {
+    if (r.length === 0) return false;
+    // Check if row is a repeated header line
+    if (r[0].toLowerCase().replace(/[^a-z]/g, '') === 'date') return false;
+    return true;
+  });
+
+  return { headers: header, rows: dataRows };
 }
 
 export function autoMapColumns(headers) {
@@ -31,8 +40,7 @@ export function autoMapColumns(headers) {
     dateIndex: -1,
     winningNumbersIndex: -1,
     ballIndices: [],
-    bonusIndex: -1,
-    multiplierIndex: -1
+    ignoredIndices: []
   };
 
   headers.forEach((h, idx) => {
@@ -41,10 +49,8 @@ export function autoMapColumns(headers) {
       if (mapping.dateIndex === -1) mapping.dateIndex = idx;
     } else if (lower.includes('winning') || lower.includes('number') || lower.includes('combination')) {
       if (mapping.winningNumbersIndex === -1) mapping.winningNumbersIndex = idx;
-    } else if (lower.includes('powerball') || lower.includes('megaball') || lower.includes('bonus') || lower.includes('pb') || lower.includes('mb')) {
-      if (mapping.bonusIndex === -1) mapping.bonusIndex = idx;
-    } else if (lower.includes('multiplier') || lower.includes('powerplay') || lower.includes('megaplier')) {
-      if (mapping.multiplierIndex === -1) mapping.multiplierIndex = idx;
+    } else if (lower.includes('bonus') || lower.includes('multiplier') || lower.includes('play')) {
+      mapping.ignoredIndices.push(idx);
     } else if (lower.includes('ball') || lower.includes('num') || lower.includes('n') || /^\d+$/.test(lower)) {
       mapping.ballIndices.push(idx);
     }
@@ -52,7 +58,7 @@ export function autoMapColumns(headers) {
 
   if (mapping.winningNumbersIndex === -1 && mapping.ballIndices.length === 0) {
     headers.forEach((h, idx) => {
-      if (idx !== mapping.dateIndex && idx !== mapping.bonusIndex && idx !== mapping.multiplierIndex) {
+      if (idx !== mapping.dateIndex && !mapping.ignoredIndices.includes(idx)) {
         mapping.ballIndices.push(idx);
       }
     });
@@ -61,63 +67,59 @@ export function autoMapColumns(headers) {
   return mapping;
 }
 
-export function convertRowsToDraws(headers, dataRows, mapping, gameType) {
+export function convertRowsToDraws(headers, dataRows, mapping) {
   const draws = [];
+  const errors = [];
 
   dataRows.forEach((row, i) => {
     if (row.length <= 1) return;
 
-    let rawDate = mapping.dateIndex >= 0 ? row[mapping.dateIndex] : new Date().toISOString().split('T')[0];
+    let rawDate = mapping.dateIndex >= 0 ? row[mapping.dateIndex] : "";
+    if (!rawDate || rawDate.trim() === "") return;
+
     let parsedDate = normalizeDate(rawDate);
 
     let numbers = [];
-
-    // Case 1: Hyphen or space separated numbers in a single column (e.g. " 1 - 5 - 6 - 11 - 39 ")
     if (mapping.winningNumbersIndex >= 0 && row[mapping.winningNumbersIndex]) {
       const cellVal = row[mapping.winningNumbersIndex];
-      // Extract all integers from string
+      // Ignore Double Play add-on rows
+      if (cellVal.toLowerCase().includes("double play")) return;
+
       const matchedInts = cellVal.match(/\d+/g);
       if (matchedInts) {
         numbers = matchedInts.map(n => parseInt(n, 10));
       }
     } else if (mapping.ballIndices.length > 0) {
-      // Case 2: Individual ball columns
       numbers = mapping.ballIndices.map(idx => parseInt(row[idx], 10)).filter(n => !isNaN(n));
     }
 
     if (numbers.length === 0) return;
 
-    // Check if bonus ball is separate or part of numbers array
-    let bonus = mapping.bonusIndex >= 0 ? parseInt(row[mapping.bonusIndex], 10) : null;
-    if (isNaN(bonus)) bonus = null;
-
-    // Sort main numbers ascending
-    numbers.sort((a, b) => a - b);
-
-    let multiplier = mapping.multiplierIndex >= 0 ? parseInt(row[mapping.multiplierIndex], 10) : null;
-
-    draws.push({
+    const candidateDraw = {
       id: `csv-${Date.now()}-${i}`,
       date: parsedDate,
-      numbers,
-      bonus,
-      multiplier
-    });
+      numbers
+    };
+
+    const valResult = validateDraw(candidateDraw);
+    if (valResult.valid) {
+      draws.push(valResult.draw);
+    } else {
+      errors.push(`Row ${i + 2}: ${valResult.errors.join(', ')}`);
+    }
   });
 
   // Sort by date descending
   draws.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  return draws;
+  return { draws, errors };
 }
 
-function normalizeDate(dateStr) {
+export function normalizeDate(dateStr) {
   if (!dateStr) return new Date().toISOString().split('T')[0];
   const clean = dateStr.trim();
   
-  // YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
 
-  // M/D/YYYY or MM/DD/YYYY
   const mdy = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (mdy) {
     const m = mdy[1].padStart(2, '0');
