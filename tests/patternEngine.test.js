@@ -224,3 +224,42 @@ test('L patterns use adjacent same-draw sources and output below either endpoint
   assert.deepEqual(example.sequencePathCellIds, ['d2-b1-ones', 'd2-b0-ones', 'd3-b0-ones']);
   assert.ok(example.label.includes('2 + 2 = 4'));
 });
+
+test('Winning Patterns includes every established pattern ending on selected rows only', () => {
+  const draws = [
+    { id: 'd1', date: '2026-08-17', numbers: [1, 2, 3, 4, 5], bonus: null },
+    { id: 'd2', date: '2026-08-18', numbers: [2, 2, 5, 4, 6], bonus: null },
+    { id: 'd3', date: '2026-08-19', numbers: [4, 8, 0, 4, 7], bonus: null }
+  ];
+  const visibleSettings = { showTens: false, showOnes: true, showMatches: false };
+  const allPatterns = generateAutomatedPatterns(draws, {
+    ...visibleSettings,
+    showMatches: true,
+    showVerticalRuns: true,
+    showDiagonalRuns: true,
+    showMathematicalSequences: true,
+    showDiagonalMathematicalSequences: true,
+    showSisterOutputSequences: true,
+    showLPatterns: true
+  });
+  const expectedIds = allPatterns
+    .filter(line => line.toCellId.startsWith('d3-'))
+    .map(line => line.id)
+    .sort();
+  const winningPatterns = generateAutomatedPatterns(draws, {
+    ...visibleSettings,
+    showWinningPatterns: true,
+    winningPatternDrawIds: ['d3']
+  });
+
+  assert.ok(expectedIds.length > 0);
+  assert.deepEqual(winningPatterns.map(line => line.id).sort(), expectedIds);
+  assert.ok(winningPatterns.every(line => line.isWinningPattern
+    && line.winningOutputDrawId === 'd3'
+    && line.toCellId.startsWith('d3-')));
+  assert.equal(generateAutomatedPatterns(draws, {
+    ...visibleSettings,
+    showWinningPatterns: true,
+    winningPatternDrawIds: []
+  }).length, 0);
+});

@@ -11,6 +11,8 @@ export function generateAutomatedPatterns(draws, settings = {}) {
     showDiagonalMathematicalSequences = false,
     showSisterOutputSequences = false,
     showLPatterns = false,
+    showWinningPatterns = false,
+    winningPatternDrawIds = [],
     showTens = true,
     showOnes = true,
     colorMatch = "#187458",
@@ -276,6 +278,30 @@ export function generateAutomatedPatterns(draws, settings = {}) {
         : (sequence.overlapsSequence ? 'dashed' : 'solid');
       lines.push(sequence);
     });
+  }
+
+  if (showWinningPatterns && winningPatternDrawIds.length) {
+    const targetDrawIds = new Set(winningPatternDrawIds.map(String));
+    const drawIdByCellId = new Map(gridRows.flatMap(row => row.map(cell => [cell.id, String(cell.drawId)])));
+    const allEstablishedPatterns = generateAutomatedPatterns(draws, {
+      ...settings,
+      showMatches: true,
+      showVerticalRuns: true,
+      showDiagonalRuns: true,
+      showMathematicalSequences: true,
+      showDiagonalMathematicalSequences: true,
+      showSisterOutputSequences: true,
+      showLPatterns: true,
+      showWinningPatterns: false,
+      winningPatternDrawIds: []
+    });
+    const combinedById = new Map(lines.map(line => [line.id, line]));
+    allEstablishedPatterns.forEach(line => {
+      const outputDrawId = drawIdByCellId.get(line.toCellId);
+      if (!targetDrawIds.has(outputDrawId)) return;
+      combinedById.set(line.id, { ...line, isWinningPattern: true, winningOutputDrawId: outputDrawId });
+    });
+    return [...combinedById.values()];
   }
 
   return lines;

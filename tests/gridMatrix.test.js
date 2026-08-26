@@ -65,3 +65,24 @@ test('a digit mapped in two future columns adds concentric highlight metadata ev
     assert.equal(cell.style.getPropertyValue('--position-highlight-secondary'), 'var(--pos-5-border)');
   });
 });
+
+test('Winning Patterns adds independently checked selectors before draw dates', () => {
+  const container = {
+    innerHTML: '',
+    querySelectorAll() { return []; }
+  };
+  const matrix = new GridMatrix(container);
+  matrix.setDraws([
+    { id: 'd1', date: '2026-08-01', numbers: [1, 2, 3, 4, 5] },
+    { id: 'd2', date: '2026-08-02', numbers: [6, 7, 8, 9, 10] }
+  ], 'cash5', {
+    showTens: false,
+    showOnes: true,
+    showWinningRowSelectors: true,
+    winningPatternDrawIds: ['d2']
+  });
+
+  assert.equal((container.innerHTML.match(/class="winning-row-checkbox"/g) || []).length, 2);
+  assert.match(container.innerHTML, /data-winning-row-id="d1"[\s\S]*?2026-08-01/);
+  assert.match(container.innerHTML, /data-winning-row-id="d2"[\s\S]*?checked[\s\S]*?2026-08-02/);
+});

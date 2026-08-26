@@ -178,10 +178,62 @@ function sanitizeRows(rows) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row, index) => {
     const numbers = sanitizeCash5Numbers(row?.numbers, 5);
-    if (numbers.length !== 5) return null;
+    const source = row?.source === 'system' ? 'system' : 'user';
+    const available = row?.available !== false;
+    if (numbers.length !== 5 && !(source === 'system' && !available)) return null;
+    const sanitizeDigitArray = (values, maximum) => Array.from({ length: 5 }, (_, column) => {
+      const parsed = parseStrictInteger(Array.isArray(values) ? values[column] : null);
+      return parsed !== null && parsed >= 0 && parsed <= maximum ? parsed : null;
+    });
+    const tensFilters = sanitizeDigitArray(row?.tensFilters, 4);
+    const tensSources = Array.from({ length: 5 }, (_, column) => {
+      const value = row?.tensSources?.[column];
+      return ['automatic', 'manual', 'empty'].includes(value) ? value : 'empty';
+    });
     return {
       id: String(row.id || `imported-row-${index}`),
+      source,
+      rank: source === 'system' && [1, 2, 3].includes(Number(row.rank)) ? Number(row.rank) : null,
+      available,
+      unavailableReason: String(row.unavailableReason || '').slice(0, 500),
       numbers,
+      digits: numbers.length === 5 ? numbers.map(number => number % 10) : sanitizeDigitArray(row?.digits, 9),
+      tensBands: numbers.length === 5 ? numbers.map(number => Math.floor(number / 10)) : [],
+      tensFilters,
+      tensSources,
+      savedAt: String(row.savedAt || ''),
+      createdFromDrawCount: Math.max(0, Number(row.createdFromDrawCount) || 0),
+      selectionScore: row.selectionScore && typeof row.selectionScore === 'object' ? {
+        tens: Number(row.selectionScore.tens) || 0,
+        historyFit: Number(row.selectionScore.historyFit) || 0
+      } : null,
+      numberEvidence: Array.isArray(row.numberEvidence) ? row.numberEvidence.slice(0, 5).map(item => ({
+        number: Number(item?.number) || 0,
+        historyFit: Number(item?.historyFit) || 0,
+        rawHistoryFit: Number(item?.rawHistoryFit) || 0,
+        motifFutureCount: Number(item?.motifFutureCount) || 0,
+        sameColumnCount: Number(item?.sameColumnCount) || 0,
+        sisterColumnCount: Number(item?.sisterColumnCount) || 0,
+        frequency: Number(item?.frequency) || 0,
+        mostRecentRowsAgo: item?.mostRecentRowsAgo === null ? null : Number(item?.mostRecentRowsAgo) || 0,
+        tensScore: Number(item?.tensScore) || 0,
+        tensReason: String(item?.tensReason || '').slice(0, 300)
+      })) : [],
+      candidateEvidence: Array.isArray(row.candidateEvidence) ? row.candidateEvidence.slice(0, 5).map(item => ({
+        column: Math.max(0, Math.min(4, Number(item?.column) || 0)),
+        digit: Math.max(0, Math.min(9, Number(item?.digit) || 0)),
+        score: Math.max(0, Math.min(100, Number(item?.score) || 0)),
+        familyCount: Math.max(0, Number(item?.familyCount) || 0),
+        signalCount: Math.max(0, Number(item?.signalCount) || 0),
+        families: Array.isArray(item?.families) ? item.families.map(family => ({
+          key: String(family?.key || ''),
+          code: String(family?.code || '').slice(0, 12),
+          label: String(family?.label || '').slice(0, 100),
+          reliability: Math.max(0, Math.min(1, Number(family?.reliability) || 0)),
+          hits: Math.max(0, Number(family?.hits) || 0),
+          trials: Math.max(0, Number(family?.trials) || 0)
+        })) : []
+      })) : [],
       label: ['strong', 'uncertain', 'ugly'].includes(row.label) ? row.label : 'uncertain',
       note: String(row.note || '').slice(0, 500)
     };
@@ -211,6 +263,87 @@ function sanitizeSlipTensFilters(values) {
   });
 }
 
+function sanitizeSlipTensSources(values) {
+  return Array.from({ length: 5 }, (_, index) => {
+    const value = Array.isArray(values) ? values[index] : null;
+    return ['automatic', 'manual', 'empty'].includes(value) ? value : 'empty';
+  });
+}
+
+function sanitizePatternSignals(signals) {
+  if (!Array.isArray(signals)) return [];
+  return signals.map((signal, index) => {
+    const targetColumn = Number(signal?.targetColumn);
+    const digit = Number(signal?.digit);
+    if (!Number.isInteger(targetColumn) || targetColumn < 0 || targetColumn > 4
+        || !Number.isInteger(digit) || digit < 0 || digit > 9) return null;
+    return {
+      id: String(signal.id || `imported-signal-${index}`),
+      pattern: String(signal.pattern || '').slice(0, 40),
+      operation: String(signal.operation || '').slice(0, 40),
+      code: String(signal.code || '').slice(0, 12),
+      label: String(signal.label || '').slice(0, 100),
+      digit,
+      targetColumn,
+      sourceColumns: Array.isArray(signal.sourceColumns)
+        ? signal.sourceColumns.map(Number).filter(column => Number.isInteger(column) && column >= 0 && column <= 4).slice(0, 4)
+        : [],
+      sourceDrawIds: Array.isArray(signal.sourceDrawIds) ? signal.sourceDrawIds.map(String).slice(0, 4) : [],
+      explanation: String(signal.explanation || '').slice(0, 500),
+      reliabilityHits: Math.max(0, Number(signal.reliabilityHits) || 0),
+      reliabilityTrials: Math.max(0, Number(signal.reliabilityTrials) || 0),
+      reliability: Math.max(0, Math.min(1, Number(signal.reliability) || 0))
+    };
+  }).filter(Boolean);
+}
+
+function sanitizeRowScores(scores) {
+  if (!Array.isArray(scores)) return [];
+  return scores.map(score => {
+    const positions = Array.isArray(score?.positions) ? score.positions.slice(0, 5).map(item => ({
+      column: Math.max(0, Math.min(4, Number(item?.column) || 0)),
+      selected: Number(item?.selected) || 0,
+      actual: Number(item?.actual) || 0,
+      exact: Boolean(item?.exact),
+      endingHit: Boolean(item?.endingHit),
+      tensHit: Boolean(item?.tensHit),
+      diagnostic: String(item?.diagnostic || '').slice(0, 100)
+    })) : [];
+    return {
+      rowId: String(score?.rowId || ''),
+      source: score?.source === 'system' ? 'system' : 'user',
+      rank: [1, 2, 3].includes(Number(score?.rank)) ? Number(score.rank) : null,
+      available: score?.available !== false,
+      unavailableReason: String(score?.unavailableReason || '').slice(0, 500),
+      hits: Math.max(0, Math.min(5, Number(score?.hits) || 0)),
+      misses: Math.max(0, Math.min(5, Number(score?.misses) || 0)),
+      matchRate: score?.matchRate === null ? null : Math.max(0, Math.min(1, Number(score?.matchRate) || 0)),
+      missRate: score?.missRate === null ? null : Math.max(0, Math.min(1, Number(score?.missRate) || 0)),
+      endingHits: Math.max(0, Math.min(5, Number(score?.endingHits) || 0)),
+      endingRate: score?.endingRate === null ? null : Math.max(0, Math.min(1, Number(score?.endingRate) || 0)),
+      tensHits: Math.max(0, Math.min(5, Number(score?.tensHits) || 0)),
+      tensRate: score?.tensRate === null ? null : Math.max(0, Math.min(1, Number(score?.tensRate) || 0)),
+      matchedNumbers: sanitizeCash5Numbers(score?.matchedNumbers),
+      missedNumbers: sanitizeCash5Numbers(score?.missedNumbers),
+      positions
+    };
+  });
+}
+
+function sanitizePatternSignalScores(scores) {
+  if (!Array.isArray(scores)) return [];
+  return scores.map(score => ({
+    signalId: String(score?.signalId || ''),
+    pattern: String(score?.pattern || '').slice(0, 40),
+    operation: String(score?.operation || '').slice(0, 40),
+    code: String(score?.code || '').slice(0, 12),
+    targetColumn: Math.max(0, Math.min(4, Number(score?.targetColumn) || 0)),
+    predictedDigit: Math.max(0, Math.min(9, Number(score?.predictedDigit) || 0)),
+    actualDigit: Math.max(0, Math.min(9, Number(score?.actualDigit) || 0)),
+    hit: Boolean(score?.hit)
+  }));
+}
+
 function sanitizeSessions(sessions) {
   if (!Array.isArray(sessions)) return [];
   return sessions.map((session, index) => {
@@ -224,22 +357,27 @@ function sanitizeSessions(sessions) {
       date: String(rawResult.date || ''),
       numbers: resultNumbers,
       candidateHits: Math.max(0, Math.min(5, Number(rawResult.candidateHits) || 0)),
-      rowScores: Array.isArray(rawResult.rowScores) ? rawResult.rowScores.map(score => ({
-        rowId: String(score?.rowId || ''),
-        hits: Math.max(0, Math.min(5, Number(score?.hits) || 0))
-      })) : []
+      rowScores: sanitizeRowScores(rawResult.rowScores),
+      patternSignalScores: sanitizePatternSignalScores(rawResult.patternSignalScores)
     } : null;
+    const kind = session.kind === 'prediction' ? 'prediction' : 'legacy';
     return {
       id: String(session.id || `imported-session-${index}`),
-      status: result ? 'scored' : 'locked',
+      kind,
+      trackingVersion: kind === 'prediction' ? Math.max(1, Number(session.trackingVersion) || 1) : null,
+      creationSource: String(session.creationSource || (kind === 'prediction' ? 'imported' : 'legacy')).slice(0, 40),
+      status: result ? 'scored' : kind === 'prediction' ? 'pending' : 'locked',
       finalizedAt: String(session.finalizedAt || new Date(0).toISOString()),
       baselineDrawId: String(session.baselineDrawId || ''),
       baselineDate: String(session.baselineDate),
+      historyStartDate: String(session.historyStartDate || ''),
+      historyDrawCount: Math.max(0, Math.min(50, Number(session.historyDrawCount) || 0)),
       motifSelections: Array.isArray(session.motifSelections) ? session.motifSelections : [],
       motifMatches: Array.isArray(session.motifMatches) ? session.motifMatches : [],
       candidateDigits: Array.isArray(session.candidateDigits) ? [...new Set(session.candidateDigits.map(Number).filter(value => Number.isInteger(value) && value >= 0 && value <= 9))] : [],
       fullCandidates: sanitizeCash5Numbers(session.fullCandidates),
       rows,
+      patternSignals: sanitizePatternSignals(session.patternSignals),
       result
     };
   }).filter(Boolean);
@@ -300,7 +438,13 @@ function sanitizeWorkspace(workspace) {
     rowBuilder,
     slipNumbers: sanitizeSlipNumbers(workspace.slipNumbers, rowBuilder),
     slipTensFilters: sanitizeSlipTensFilters(workspace.slipTensFilters),
+    slipTensSources: sanitizeSlipTensSources(workspace.slipTensSources),
     draftRows: sanitizeRows(workspace.draftRows),
-    sessions: sanitizeSessions(workspace.sessions)
+    sessions: sanitizeSessions(workspace.sessions),
+    predictionTracker: workspace.predictionTracker && typeof workspace.predictionTracker === 'object' ? {
+      version: Math.max(0, Number(workspace.predictionTracker.version) || 0),
+      initializedAt: String(workspace.predictionTracker.initializedAt || ''),
+      latestOfficialDrawDate: String(workspace.predictionTracker.latestOfficialDrawDate || '')
+    } : null
   };
 }

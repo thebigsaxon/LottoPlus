@@ -142,3 +142,49 @@ test('validateProject accepts version 3 documents and rejects retired game proje
   assert.equal(retired.valid, false);
   assert.match(retired.errors[0], /does not support/);
 });
+
+test('validateProject preserves version 4 prediction sessions and manual Any tens choices', () => {
+  const current = validateProject({
+    appName: 'Cash 5 Studio',
+    version: 4,
+    draws: [
+      { id: 'base', date: '2026-08-01', numbers: [1, 12, 23, 34, 41] },
+      { id: 'actual', date: '2026-08-02', numbers: [2, 13, 24, 35, 42] }
+    ],
+    workspace: {
+      slipTensFilters: [null, 1, 2, 3, 4],
+      slipTensSources: ['manual', 'manual', 'automatic', 'empty', 'automatic'],
+      predictionTracker: { version: 1, initializedAt: '2026-08-01T00:00:00Z', latestOfficialDrawDate: '2026-08-02' },
+      sessions: [{
+        id: 'prediction-base',
+        kind: 'prediction',
+        status: 'scored',
+        trackingVersion: 1,
+        baselineDrawId: 'base',
+        baselineDate: '2026-08-01',
+        historyDrawCount: 20,
+        rows: [{ id: 'rank-1', source: 'system', rank: 1, available: true, numbers: [1, 12, 23, 34, 41] }],
+        patternSignals: [{
+          id: 'signal-1', pattern: 'inline', operation: 'add', code: 'IM:+', digit: 2,
+          targetColumn: 0, sourceColumns: [0, 0], explanation: '1 + 1 = 2', reliability: 0.5
+        }],
+        result: {
+          drawId: 'actual', date: '2026-08-02', numbers: [2, 13, 24, 35, 42],
+          rowScores: [{ rowId: 'rank-1', source: 'system', rank: 1, available: true, hits: 0, misses: 5 }],
+          patternSignalScores: [{
+            signalId: 'signal-1', pattern: 'inline', operation: 'add', code: 'IM:+',
+            targetColumn: 0, predictedDigit: 2, actualDigit: 2, hit: true
+          }]
+        }
+      }]
+    }
+  });
+  assert.equal(current.valid, true);
+  assert.deepEqual(current.workspace.slipTensSources, ['manual', 'manual', 'automatic', 'empty', 'automatic']);
+  assert.equal(current.workspace.slipTensFilters[0], null);
+  assert.equal(current.workspace.predictionTracker.version, 1);
+  assert.equal(current.workspace.sessions[0].kind, 'prediction');
+  assert.equal(current.workspace.sessions[0].rows[0].source, 'system');
+  assert.equal(current.workspace.sessions[0].patternSignals[0].code, 'IM:+');
+  assert.equal(current.workspace.sessions[0].result.patternSignalScores[0].hit, true);
+});

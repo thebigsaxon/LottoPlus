@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const htmlPath = new URL('../index.html', import.meta.url);
 const appPath = new URL('../js/app.js', import.meta.url);
 const gridPath = new URL('../js/gridMatrix.js', import.meta.url);
+const stylesPath = new URL('../css/styles.css', import.meta.url);
 const webViewPath = new URL('../LottoPlusApp/WebView.swift', import.meta.url);
 
 test('Cash 5 Studio shell exposes contextual pattern, annotation, and session surfaces', async () => {
@@ -15,6 +16,10 @@ test('Cash 5 Studio shell exposes contextual pattern, annotation, and session su
   assert.match(html, /Left\/right sister shifts/);
   assert.match(html, /id="chkSisterOutputSequences"/);
   assert.match(html, /id="chkLPatterns"/);
+  assert.match(html, /id="chkWinningPatterns"/);
+  assert.match(html, />Winning Patterns</);
+  assert.match(html, /class="tens-reference-toggle"/);
+  assert.ok(html.indexOf('id="chkTens"') < html.indexOf('id="btnPatterns"'));
   assert.match(html, /id="futureDigitGrid"/);
   assert.match(html, /id="futureAllDigitGrid"/);
   assert.match(html, /id="allDigitsDisclosure"/);
@@ -27,6 +32,8 @@ test('Cash 5 Studio shell exposes contextual pattern, annotation, and session su
   assert.match(html, /Your five positions/);
   assert.match(html, /latest 50 loaded drawings/);
   assert.match(html, /id="sessionsPanel" hidden/);
+  assert.match(html, /Historical outcome ledger/);
+  assert.match(html, />Save for next draw</);
   assert.match(html, /id="composerCard"/);
   assert.match(html, /id="btnZoomOut"/);
   assert.match(html, /id="btnZoomReset"/);
@@ -56,9 +63,15 @@ test('position highlighting, click-off Patterns, and native sharing are wired', 
   assert.match(appSource, /showDiagonalMathematicalSequences = e\.target\.checked/);
   assert.match(appSource, /showSisterOutputSequences = e\.target\.checked/);
   assert.match(appSource, /showLPatterns = e\.target\.checked/);
+  assert.match(appSource, /showWinningPatterns = e\.target\.checked/);
+  assert.match(appSource, /onWinningRowToggleCallback/);
   assert.match(appSource, /rankPatternRecommendationsByColumn\(this\.researchDraws, 3\)/);
   assert.match(appSource, /walk-forward hit rate/);
   assert.match(appSource, /pattern-support-list/);
+  assert.match(appSource, /initializePredictionLedger/);
+  assert.match(appSource, /reconcileOfficialDraws/);
+  assert.match(appSource, /Historical pattern agreement/);
+  assert.match(appSource, /Pattern shorthand scorecard/);
   assert.match(appSource, /successor-rank-/);
   assert.match(gridSource, /setPositionHighlights/);
   assert.match(gridSource, /position-highlighted/);
@@ -88,10 +101,18 @@ test('manual themes and independent live jackpot updates are wired', async () =>
   assert.match(webViewSource, /www\.sceducationlottery\.com/);
 });
 
-test('project persistence uses version 3 while retaining one-way legacy Cash 5 migration', async () => {
+test('project persistence uses version 4 while retaining one-way legacy Cash 5 migration', async () => {
   const source = await readFile(appPath, 'utf8');
-  assert.match(source, /version: 3/);
+  assert.match(source, /version: 4/);
   assert.match(source, /cash5studio_current_project/);
   assert.match(source, /lottoplus_current_project/);
   assert.match(source, /\.cash5studio/);
+});
+
+test('mapped Next Draw digits use a high-contrast circular selection ring', async () => {
+  const styles = await readFile(stylesPath, 'utf8');
+  assert.match(styles, /--selection-ring:/);
+  assert.match(styles, /\.future-map-cell\.mapped b, \.pattern-recommendation-cell\.mapped b/);
+  assert.match(styles, /border: 3px solid var\(--selection-ring\)/);
+  assert.match(styles, /border-radius: 50%/);
 });

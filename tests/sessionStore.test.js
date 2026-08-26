@@ -1,6 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clearCandidateState, createDraftRow, editSessionInBuilder, finalizeSession, formatSessionForMessage, scoreSession, validateTicketRow } from '../js/sessionStore.js';
+import { SAMPLE_CASH_5 } from '../js/sampleData.js';
+import {
+  appendDraftRowsToPendingSession,
+  autoSelectTensFilters,
+  clearCandidateState,
+  createDraftRow,
+  createPredictionSession,
+  editSessionInBuilder,
+  finalizeSession,
+  formatSessionForMessage,
+  initializePredictionLedger,
+  reconcileOfficialDraws,
+  scorePredictionSession,
+  scoreSession,
+  summarizePredictionHistory,
+  validateTicketRow
+} from '../js/sessionStore.js';
 
 test('clearing candidates preserves completed rows and locked sessions', () => {
   const draftRows = [{ id: 'draft-1', numbers: [1, 2, 3, 4, 5] }];
@@ -75,4 +91,130 @@ test('pending sessions return to the Ticket Builder while scored sessions are co
   const scoredEdit = editSessionInBuilder({ draftRows: [], sessions: [scored] }, scored.id, 123);
   assert.equal(scoredEdit.sessions.length, 1);
   assert.equal(scoredEdit.draftRows[0].id, 'row-123-0');
+});
+
+test('prediction ledger backfills ten scored dates and leaves one pending without leakage', () => {
+  const initialized = initializePredictionLedger({ sessions: [] }, SAMPLE_CASH_5, new Date('2026-08-05T00:00:00Z'));
+  const sessions = initialized.workspace.sessions;
+  assert.equal(initialized.initialized, true);
+  assert.equal(sessions.length, 11);
+  assert.equal(sessions.filter(session => session.result).length, 10);
+  assert.equal(sessions.filter(session => !session.result).length, 1);
+  assert.equal(sessions[0].baselineDate, '2026-08-04');
+  assert.equal(sessions[0].status, 'pending');
+
+  const chronological = [...SAMPLE_CASH_5].sort((a, b) => a.date.localeCompare(b.date));
+  const historical = sessions.find(session => session.baselineDate === '2026-07-25');
+  const prefix = chronological.filter(draw => draw.date <= historical.baselineDate);
+  const rebuilt = createPredictionSession(prefix, { creationSource: 'test' });
+  assert.deepEqual(historical.rows, rebuilt.rows);
+  assert.deepEqual(historical.patternSignals, rebuilt.patternSignals);
+  assert.equal(historical.historyDrawCount, 25);
+  assert.equal(historical.result.date, '2026-07-26');
+
+  const secondPass = initializePredictionLedger(initialized.workspace, SAMPLE_CASH_5);
+  assert.equal(secondPass.initialized, false);
+  assert.equal(secondPass.workspace.sessions.length, 11);
+});
+
+test('system rows are deterministic, ordered, and expose sparse ranks as unavailable', () => {
+  const first = createPredictionSession(SAMPLE_CASH_5);
+  const second = createPredictionSession([...SAMPLE_CASH_5].reverse());
+  assert.deepEqual(first.rows, second.rows);
+  first.rows.filter(row => row.available).forEach(row => {
+    assert.equal(row.numbers.length, 5);
+    assert.equal(new Set(row.numbers).size, 5);
+    assert.ok(row.numbers.every((number, index) => index === 0 || number > row.numbers[index - 1]));
+    assert.deepEqual(row.numbers.map(number => number % 10), row.digits);
+    assert.deepEqual(row.numbers.map(number => Math.floor(number / 10)), row.tensBands);
+  });
+
+  const sparse = createPredictionSession([
+    { id: 'same-digits', date: '2026-08-01', numbers: [1, 11, 21, 31, 41] }
+  ]);
+  assert.equal(sparse.rows[2].available, false);
+  assert.match(sparse.rows[2].unavailableReason, /lacked pattern support/);
+});
+
+test('prediction scoring records exact, ending, tens, and every signal outcome', () => {
+  const session = {
+    id: 'prediction-base',
+    kind: 'prediction',
+    status: 'pending',
+    baselineDate: '2026-08-01',
+    rows: [{
+      id: 'system-rank-1', source: 'system', rank: 1, available: true,
+      numbers: [1, 12, 23, 34, 41]
+    }],
+    patternSignals: [
+      { id: 'signal-win', pattern: 'inline', operation: 'add', code: 'IM:+', targetColumn: 0, digit: 1 },
+      { id: 'signal-loss', pattern: 'diagonal', operation: 'subtract', code: 'DM:−A', targetColumn: 1, digit: 2 }
+    ]
+  };
+  const scored = scorePredictionSession(session, {
+    id: 'actual', date: '2026-08-02', numbers: [1, 15, 23, 37, 42]
+  });
+  const row = scored.result.rowScores[0];
+  assert.equal(row.hits, 2);
+  assert.equal(row.matchRate, 0.4);
+  assert.equal(row.missRate, 0.6);
+  assert.equal(row.endingHits, 2);
+  assert.equal(row.tensHits, 5);
+  assert.equal(row.positions[1].diagnostic, 'tens right / ending wrong');
+  assert.deepEqual(scored.result.patternSignalScores.map(item => item.hit), [true, false]);
+  assert.equal(scored.result.patternSummary.families.find(item => item.pattern === 'inline').hits, 1);
+});
+
+test('official reconciliation processes multiple unseen draws and leaves one pending session', () => {
+  const initialized = initializePredictionLedger({ sessions: [] }, SAMPLE_CASH_5).workspace;
+  const additions = [
+    { id: 'c5-new-1', date: '2026-08-05', numbers: [2, 7, 18, 29, 40] },
+    { id: 'c5-new-2', date: '2026-08-06', numbers: [3, 9, 20, 31, 42] }
+  ];
+  const official = [...SAMPLE_CASH_5, ...additions];
+  const reconciled = reconcileOfficialDraws(initialized, SAMPLE_CASH_5, official, new Date('2026-08-06T23:00:00Z'));
+  assert.deepEqual(reconciled.processedDraws.map(draw => draw.date), ['2026-08-05', '2026-08-06']);
+  const sessions = reconciled.workspace.sessions;
+  assert.equal(sessions.filter(session => session.kind === 'prediction' && !session.result).length, 1);
+  assert.equal(sessions.find(session => session.baselineDate === '2026-08-04').result.date, '2026-08-05');
+  assert.equal(sessions.find(session => session.baselineDate === '2026-08-05').result.date, '2026-08-06');
+  assert.equal(sessions[0].baselineDate, '2026-08-06');
+});
+
+test('user lines append to the active prediction and duplicate rows are ignored', () => {
+  const initialized = initializePredictionLedger({ sessions: [] }, SAMPLE_CASH_5).workspace;
+  const latest = [...SAMPLE_CASH_5].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+  const draft = createDraftRow([1, 5, 12, 23, 42], 'strong', 'mine', {
+    tensFilters: [0, 0, 1, 2, 4],
+    tensSources: ['automatic', 'manual', 'automatic', 'manual', 'manual']
+  });
+  const first = appendDraftRowsToPendingSession({ ...initialized, draftRows: [draft] }, latest, SAMPLE_CASH_5);
+  assert.equal(first.addedCount, 1);
+  assert.equal(first.session.rows.filter(row => row.source === 'user').length, 1);
+  const duplicate = appendDraftRowsToPendingSession({ ...first.workspace, draftRows: [draft] }, latest, SAMPLE_CASH_5);
+  assert.equal(duplicate.addedCount, 0);
+  assert.equal(duplicate.session.rows.filter(row => row.source === 'user').length, 1);
+});
+
+test('automatic tens preserve manual bands and a manual Any tens choice', () => {
+  const selected = autoSelectTensFilters({
+    futureDigitMap: [{ column: 2, digit: 3 }],
+    slipNumbers: [null, null, null, null, null],
+    slipTensFilters: [null, 1, null, null, null],
+    slipTensSources: ['manual', 'manual', 'empty', 'automatic', 'empty']
+  }, SAMPLE_CASH_5);
+  assert.equal(selected.tensSources[0], 'manual');
+  assert.equal(selected.tensFilters[0], null);
+  assert.equal(selected.tensSources[1], 'manual');
+  assert.equal(selected.tensFilters[1], 1);
+  assert.ok(selected.tensSources.slice(2).every(source => source === 'automatic'));
+});
+
+test('historical summary separates system ranks from user lines', () => {
+  const initialized = initializePredictionLedger({ sessions: [] }, SAMPLE_CASH_5).workspace;
+  const summary = summarizePredictionHistory(initialized.sessions);
+  assert.equal(summary.groups.find(group => group.key === 'system-1').trials, 50);
+  assert.equal(summary.groups.find(group => group.key === 'user').trials, 0);
+  assert.ok(summary.patterns.families.length >= 7);
+  assert.ok(summary.patterns.families.every(item => item.hits <= item.trials));
 });

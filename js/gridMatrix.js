@@ -9,7 +9,16 @@ export class GridMatrix {
     this.highlightedDigit = null;
     this.positionHighlights = [];
     this.onCellClickCallback = null;
-    this.options = { showTens: false, showOnes: true, selectedCellIds: [], rowRoles: {}, selectableContextRows: false };
+    this.onWinningRowToggleCallback = null;
+    this.options = {
+      showTens: false,
+      showOnes: true,
+      selectedCellIds: [],
+      rowRoles: {},
+      selectableContextRows: false,
+      showWinningRowSelectors: false,
+      winningPatternDrawIds: []
+    };
   }
 
   setDraws(draws, _gameType = 'cash5', options = {}) {
@@ -38,8 +47,17 @@ export class GridMatrix {
       return;
     }
 
-    const { showTens, showOnes, selectedCellIds, rowRoles, selectableContextRows } = this.options;
+    const {
+      showTens,
+      showOnes,
+      selectedCellIds,
+      rowRoles,
+      selectableContextRows,
+      showWinningRowSelectors,
+      winningPatternDrawIds
+    } = this.options;
     const selectedIds = new Set(selectedCellIds);
+    const winningDrawIds = new Set((winningPatternDrawIds || []).map(String));
     const columnSpan = showTens && showOnes ? 2 : 1;
     const header = `<thead><tr><th>Draw date</th>${Array.from({ length: 5 }, (_, index) => (
       `<th colspan="${columnSpan}">Ball ${index + 1}</th>${index < 4 ? '<th class="ball-sep"></th>' : ''}`
@@ -51,6 +69,12 @@ export class GridMatrix {
       const role = rowRoles[draw.id] || '';
       const displayRole = role === 'past' ? 'Previous' : role === 'present' ? 'Latest' : '';
       const roleClass = role ? ` context-row context-${role}` : '';
+      const winningSelector = showWinningRowSelectors
+        ? `<label class="winning-row-toggle" title="Show all successful patterns ending on ${safeDate}">
+            <input type="checkbox" class="winning-row-checkbox" data-winning-row-id="${safeId}"
+              aria-label="Show winning patterns ending on ${safeDate}" ${winningDrawIds.has(String(draw.id)) ? 'checked' : ''}>
+          </label>`
+        : '';
       const cells = draw.numbers.map((number, column) => {
         const formatted = number.toString().padStart(2, '0');
         const tensDigit = formatted[0];
@@ -67,7 +91,7 @@ export class GridMatrix {
           : '';
         return `${tens}${ones}${column < 4 ? '<td class="ball-sep"></td>' : ''}`;
       }).join('');
-      return `<tr class="${roleClass}"><td class="date-cell">${displayRole ? `<span class="row-role-badge">${displayRole}</span>` : ''}${safeDate}</td>${cells}</tr>`;
+      return `<tr class="${roleClass}"><td class="date-cell"><div class="date-cell-inner">${winningSelector}<span class="date-cell-text">${displayRole ? `<span class="row-role-badge">${displayRole}</span>` : ''}${safeDate}</span></div></td>${cells}</tr>`;
     }).join('');
 
     this.container.innerHTML = `<table class="grid-table" id="matrixTable">${header}<tbody>${body}</tbody></table>`;
@@ -76,6 +100,12 @@ export class GridMatrix {
   }
 
   attachCellEvents() {
+    this.container.querySelectorAll('.winning-row-checkbox').forEach(input => {
+      input.addEventListener('change', event => {
+        event.stopPropagation();
+        this.onWinningRowToggleCallback?.(input.dataset.winningRowId, input.checked);
+      });
+    });
     this.container.querySelectorAll('.square-cell').forEach(cell => {
       const activate = () => this.onCellClickCallback?.(cell, cell.dataset.cellId, Number(cell.dataset.digit));
       cell.addEventListener('click', activate);

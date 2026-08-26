@@ -152,6 +152,26 @@ function buildReliability(draws) {
   return stats;
 }
 
+/** Capture the exact next-draw signals and their leakage-free historical reliability. */
+export function snapshotNextPatternSignals(draws = []) {
+  const safeDraws = chronologicalDraws(draws);
+  const reliability = buildReliability(safeDraws);
+  const latestDraw = safeDraws.at(-1);
+  const previousDraw = safeDraws.at(-2);
+  return projectNextPatternSignals(safeDraws).map(signal => {
+    const stats = reliability.get(reliabilityKey(signal)) || { hits: 0, trials: 0 };
+    return {
+      ...signal,
+      sourceDrawIds: signal.pattern === 'lPattern'
+        ? [latestDraw?.id, latestDraw?.id].filter(Boolean)
+        : [previousDraw?.id, latestDraw?.id].filter(Boolean),
+      reliabilityHits: stats.hits,
+      reliabilityTrials: stats.trials,
+      reliability: (stats.hits + 1) / (stats.trials + 2)
+    };
+  });
+}
+
 function scoreCurrentColumns(draws, limit = 3) {
   const safeDraws = chronologicalDraws(draws);
   const reliability = buildReliability(safeDraws);

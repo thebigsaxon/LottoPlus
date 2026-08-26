@@ -15,7 +15,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=13">
+  <link rel="stylesheet" href="css/styles.css?v=17">
 </head>
 <body>
   <header class="app-toolbar">
@@ -75,6 +75,10 @@
         <header class="surface-header">
           <div><span class="eyebrow">Latest 10 drawings</span><h2>Draw History</h2></div>
           <div class="surface-actions">
+            <label class="tens-reference-toggle">
+              <input type="checkbox" id="chkTens">
+              <span>Show tens</span>
+            </label>
             <div class="popover-wrap">
               <button class="btn btn-secondary" id="btnPatterns" type="button" aria-expanded="false" aria-controls="patternsPopover">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h2m4 0h10M4 17h7m4 0h5"></path><circle cx="16" cy="7" r="2"></circle><circle cx="8" cy="12" r="2"></circle><circle cx="13" cy="17" r="2"></circle></svg>
@@ -89,8 +93,7 @@
                 <label><input type="checkbox" id="chkDiagonalMathematicalSequences"><i class="legend-dot math-diagonal"></i><span>Three-draw diagonal sequences</span></label>
                 <label><input type="checkbox" id="chkSisterOutputSequences"><i class="legend-dot math-sister-output"></i><span>Three-draw sister outputs</span></label>
                 <label><input type="checkbox" id="chkLPatterns"><i class="legend-dot math-l"></i><span>L-pattern sequences</span></label>
-                <hr>
-                <label><input type="checkbox" id="chkTens"><span>Show tens reference</span></label>
+                <label><input type="checkbox" id="chkWinningPatterns"><i class="legend-dot winning"></i><span>Winning Patterns</span></label>
                 <input type="checkbox" id="chkOnes" checked disabled hidden>
               </div>
             </div>
@@ -199,7 +202,7 @@
           <div><button class="text-btn" id="btnClearSlip" type="button">Clear slip</button><button class="btn btn-primary" id="btnAddDraftRow" type="button">Save row</button></div>
         </div>
         <div id="draftRows" class="draft-rows empty-state">No saved rows yet.</div>
-        <div class="finalize-bar"><p>Lock saved rows against the first result after the latest loaded draw.</p><button class="btn btn-primary" id="btnFinalizeSession" type="button">Finalize for next draw</button></div>
+        <div class="finalize-bar"><p>Save these lines beside the system ranks and pattern snapshot for the next official draw.</p><button class="btn btn-primary" id="btnFinalizeSession" type="button">Save for next draw</button></div>
         <div class="finalize-share-prompt" id="finalizeSharePrompt" hidden aria-live="polite"></div>
       </article>
     </section>
@@ -213,12 +216,12 @@
   <aside class="sessions-panel" id="sessionsPanel" hidden aria-label="Saved Sessions">
     <div class="sessions-backdrop" data-close-sessions></div>
     <section class="sessions-drawer" role="dialog" aria-modal="true" aria-labelledby="sessionsTitle">
-      <header><div><span class="eyebrow">Outcome review</span><h2 id="sessionsTitle">Saved Sessions</h2></div><button class="icon-btn" id="btnCloseSessions" type="button" aria-label="Close saved sessions">×</button></header>
+      <header><div><span class="eyebrow">Historical outcome ledger</span><h2 id="sessionsTitle">Saved Sessions</h2></div><button class="icon-btn" id="btnCloseSessions" type="button" aria-label="Close saved sessions">×</button></header>
       <div id="sessionHistory" class="session-history empty-state">No saved sessions yet.</div>
     </section>
   </aside>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  <script type="module" src="js/app.js?v=25"></script>
+  <script type="module" src="js/app.js?v=27"></script>
 </body>
 </html>

@@ -2,19 +2,29 @@
 
 import { SAMPLE_CASH_5 } from './sampleData.js?v=3';
 import { parseCSV, autoMapColumns, convertRowsToDraws } from './csvParser.js';
-import { generateAutomatedPatterns } from './patternEngine.js?v=5';
+import { generateAutomatedPatterns } from './patternEngine.js?v=6';
 import { ConnectionEngine, normalizeManualConnectionChains } from './connectionEngine.js?v=10';
-import { GridMatrix } from './gridMatrix.js?v=6';
+import { GridMatrix } from './gridMatrix.js?v=7';
 import { fetchLiveCash5Update } from './liveFetcher.js?v=4';
-import { validateProject, validateDraw, escapeHTML } from './validation.js?v=3';
+import { validateProject, validateDraw, escapeHTML } from './validation.js?v=4';
 import { cash5AnalysisWindow, cash5ResearchWindow } from './drawFilters.js?v=2';
 import { findBoardSimilarSequences } from './motifEngine.js?v=4';
 import { buildNumberEvidence } from './evidenceEngine.js';
 import { classifyOnesHeat } from './onesAnalysis.js';
-import { createDraftRow, editSessionInBuilder, finalizeSession, formatSessionForMessage, scorePendingSessions } from './sessionStore.js?v=5';
+import {
+  appendDraftRowsToPendingSession,
+  autoSelectTensFilters,
+  createDraftRow,
+  editSessionInBuilder,
+  formatSessionForMessage,
+  initializePredictionLedger,
+  PATTERN_LABELS,
+  reconcileOfficialDraws,
+  summarizePredictionHistory
+} from './sessionStore.js?v=6';
 import { futureCellEvidence, rankHistoricalSuccessors, selectFutureDigit } from './futureWorkspace.js?v=4';
 import { buildDigitRepeatSummary } from './repeatSummary.js';
-import { rankPatternRecommendationsByColumn } from './patternRecommendations.js?v=2';
+import { rankPatternRecommendationsByColumn } from './patternRecommendations.js?v=3';
 import { hasAvailableOrderedSlip, recommendTensBands, TENS_BANDS, tensDigitForNumber } from './fuzzyTens.js?v=3';
 
 const INTERFACE_ZOOM_STEPS = [0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
@@ -43,8 +53,10 @@ function createWorkspaceState() {
     rowBuilder: [],
     slipNumbers: [null, null, null, null, null],
     slipTensFilters: [null, null, null, null, null],
+    slipTensSources: ['empty', 'empty', 'empty', 'empty', 'empty'],
     draftRows: [],
-    sessions: []
+    sessions: [],
+    predictionTracker: null
   };
 }
 
@@ -59,6 +71,7 @@ export class Cash5StudioApp {
     this.recentFinalizedSessionId = null;
     this.jackpot = null;
     this.jackpotIsStale = true;
+    this.winningPatternDrawIds = new Set();
 
     this.patternSettings = {
       showMatches: false,
@@ -68,6 +81,7 @@ export class Cash5StudioApp {
       showDiagonalMathematicalSequences: false,
       showSisterOutputSequences: false,
       showLPatterns: false,
+      showWinningPatterns: false,
       showTens: false,
       showOnes: true,
       linkBonusCurrentAndPrevOnly: false
@@ -89,7 +103,7 @@ export class Cash5StudioApp {
       this.bindEvents();
       this.loadCachedJackpot();
       this.loadFromLocalStorage();
-      this.applyFilters();
+      this.applyFilters({ initializeLedger: true });
     });
   }
 
@@ -118,6 +132,7 @@ export class Cash5StudioApp {
     this.chkDiagonalMathematicalSequences = document.getElementById("chkDiagonalMathematicalSequences");
     this.chkSisterOutputSequences = document.getElementById("chkSisterOutputSequences");
     this.chkLPatterns = document.getElementById("chkLPatterns");
+    this.chkWinningPatterns = document.getElementById("chkWinningPatterns");
     this.chkTens = document.getElementById("chkTens");
     this.chkOnes = document.getElementById("chkOnes");
     this.digitRepeatSummary = document.getElementById("digitRepeatSummary");
@@ -276,6 +291,12 @@ export class Cash5StudioApp {
       }
     };
 
+    this.gridMatrix.onWinningRowToggleCallback = (drawId, checked) => {
+      if (checked) this.winningPatternDrawIds.add(drawId);
+      else this.winningPatternDrawIds.delete(drawId);
+      this.updateLines();
+    };
+
     this.connectionEngine.onLineAddedCallback = (newLine) => {
       if (!this.manualLines.some(l => l.id === newLine.id)) {
         this.manualLines.push(newLine);
@@ -380,6 +401,13 @@ export class Cash5StudioApp {
       });
     }
 
+    if (this.chkWinningPatterns) {
+      this.chkWinningPatterns.addEventListener("change", (e) => {
+        this.patternSettings.showWinningPatterns = e.target.checked;
+        this.updateState();
+      });
+    }
+
     if (this.chkTens) {
       this.chkTens.addEventListener("change", (e) => {
         this.patternSettings.showTens = e.target.checked;
@@ -425,7 +453,9 @@ export class Cash5StudioApp {
     this.btnClearSlip?.addEventListener("click", () => {
       this.workspace.slipNumbers = [null, null, null, null, null];
       this.workspace.slipTensFilters = [null, null, null, null, null];
+      this.workspace.slipTensSources = ['empty', 'empty', 'empty', 'empty', 'empty'];
       this.workspace.rowBuilder = [];
+      this.refreshAutomaticTens();
       this.renderCash5Workspace();
       this.saveToLocalStorage();
     });
@@ -535,6 +565,9 @@ export class Cash5StudioApp {
     let drawCount = 0;
     if (update.draws.ok) {
       drawCount = update.draws.value.length;
+      const previousDraws = this.draws;
+      const reconciliation = reconcileOfficialDraws(this.workspace, previousDraws, update.draws.value);
+      this.workspace = reconciliation.workspace;
       this.draws = update.draws.value;
       this.manualLines = [];
       this.applyFilters();
@@ -564,16 +597,36 @@ export class Cash5StudioApp {
     this.btnFetchLive?.removeAttribute("aria-busy");
   }
 
-  applyFilters() {
+  applyFilters(options = {}) {
     this.filteredDraws = cash5AnalysisWindow(this.draws);
     this.researchDraws = cash5ResearchWindow(this.draws);
     this.workspace.motifSelections = [];
     this.workspace.motifMatches = [];
-    this.workspace.sessions = scorePendingSessions(this.workspace.sessions, this.draws);
+    if (options.initializeLedger) {
+      this.workspace = initializePredictionLedger(this.workspace, this.draws).workspace;
+    }
+    this.refreshAutomaticTens();
     this.updateState();
   }
 
+  refreshAutomaticTens() {
+    const selection = autoSelectTensFilters(this.workspace, this.researchDraws);
+    this.workspace.slipTensFilters = selection.tensFilters;
+    this.workspace.slipTensSources = selection.tensSources;
+    if (!Array.isArray(this.workspace.slipNumbers)) return;
+    this.workspace.slipNumbers = this.workspace.slipNumbers.map((number, column) => {
+      if (!Number.isInteger(number) || selection.tensSources[column] === 'manual') return number;
+      const band = selection.tensFilters[column];
+      return Number.isInteger(band) && tensDigitForNumber(number) !== band ? null : number;
+    });
+    this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
+  }
+
   updateState() {
+    const visibleDrawIds = new Set(this.filteredDraws.map(draw => String(draw.id)));
+    this.winningPatternDrawIds = new Set(
+      [...this.winningPatternDrawIds].filter(drawId => visibleDrawIds.has(drawId))
+    );
     const rowRoles = {};
     if (this.filteredDraws.length >= 2) {
       rowRoles[this.filteredDraws[this.filteredDraws.length - 2].id] = 'past';
@@ -585,7 +638,9 @@ export class Cash5StudioApp {
         showOnes: this.patternSettings.showOnes,
         selectedCellIds: [],
         rowRoles,
-        selectableContextRows: false
+        selectableContextRows: false,
+        showWinningRowSelectors: this.patternSettings.showWinningPatterns,
+        winningPatternDrawIds: [...this.winningPatternDrawIds]
       });
       this.gridMatrix.setPositionHighlights(this.workspace.futureDigitMap);
     }
@@ -645,7 +700,10 @@ export class Cash5StudioApp {
 
   updateLines() {
     this.manualLines = normalizeManualConnectionChains(this.manualLines);
-    this.autoLines = generateAutomatedPatterns(this.filteredDraws, this.patternSettings);
+    this.autoLines = generateAutomatedPatterns(this.filteredDraws, {
+      ...this.patternSettings,
+      winningPatternDrawIds: [...this.winningPatternDrawIds]
+    });
     if (this.connectionEngine) {
       this.connectionEngine.setLines(this.manualLines, this.autoLines);
     }
@@ -660,6 +718,7 @@ export class Cash5StudioApp {
         this.activeDigitHighlight = null;
         this.gridMatrix?.setHighlightedDigit(null);
         this.gridMatrix?.setPositionHighlights([]);
+        this.refreshAutomaticTens();
         this.renderCash5Workspace();
         this.saveToLocalStorage();
       });
@@ -685,10 +744,20 @@ export class Cash5StudioApp {
     if (this.btnAddDraftRow) {
       this.btnAddDraftRow.addEventListener('click', () => {
         try {
-          this.workspace.draftRows.push(createDraftRow(this.workspace.slipNumbers));
+          this.workspace.draftRows.push(createDraftRow(
+            this.workspace.slipNumbers,
+            'uncertain',
+            '',
+            {
+              tensFilters: this.workspace.slipTensFilters,
+              tensSources: this.workspace.slipTensSources
+            }
+          ));
           this.workspace.slipNumbers = [null, null, null, null, null];
           this.workspace.slipTensFilters = [null, null, null, null, null];
+          this.workspace.slipTensSources = ['empty', 'empty', 'empty', 'empty', 'empty'];
           this.workspace.rowBuilder = [];
+          this.refreshAutomaticTens();
           this.renderCash5Workspace();
           this.saveToLocalStorage();
           this.showToast('Row saved. Build another row or finalize for the next draw.');
@@ -701,16 +770,19 @@ export class Cash5StudioApp {
       this.btnFinalizeSession.addEventListener('click', () => {
         try {
           const latestDraw = this.filteredDraws[this.filteredDraws.length - 1];
-          const snapshot = finalizeSession(this.workspace, latestDraw);
-          this.workspace.sessions.unshift(snapshot);
-          this.recentFinalizedSessionId = snapshot.id;
-          this.workspace.draftRows = [];
+          const finalized = appendDraftRowsToPendingSession(this.workspace, latestDraw, this.researchDraws);
+          this.workspace = finalized.workspace;
+          this.recentFinalizedSessionId = finalized.session.id;
           this.workspace.slipNumbers = [null, null, null, null, null];
           this.workspace.slipTensFilters = [null, null, null, null, null];
+          this.workspace.slipTensSources = ['empty', 'empty', 'empty', 'empty', 'empty'];
           this.workspace.rowBuilder = [];
+          this.refreshAutomaticTens();
           this.renderCash5Workspace();
           this.saveToLocalStorage();
-          this.showToast('Session finalized for the next draw.');
+          this.showToast(finalized.addedCount
+            ? `${finalized.addedCount} line${finalized.addedCount === 1 ? '' : 's'} saved with the next-draw prediction.`
+            : 'Those lines were already saved for the next drawing.');
         } catch (error) {
           this.showToast(error.message);
         }
@@ -810,6 +882,7 @@ export class Cash5StudioApp {
             ? (this.workspace.futureDigitMap[0] ? { ...this.workspace.futureDigitMap[0] } : null)
             : { column, digit };
           this.gridMatrix?.setPositionHighlights(this.workspace.futureDigitMap);
+          this.refreshAutomaticTens();
           this.renderCash5Workspace();
           this.saveToLocalStorage();
         });
@@ -978,7 +1051,11 @@ export class Cash5StudioApp {
     if (!Array.isArray(this.workspace.slipTensFilters) || this.workspace.slipTensFilters.length !== 5) {
       this.workspace.slipTensFilters = [null, null, null, null, null];
     }
+    if (!Array.isArray(this.workspace.slipTensSources) || this.workspace.slipTensSources.length !== 5) {
+      this.workspace.slipTensSources = ['empty', 'empty', 'empty', 'empty', 'empty'];
+    }
     const tensFilters = this.workspace.slipTensFilters;
+    const tensSources = this.workspace.slipTensSources;
     const filledNumbers = slip.filter(Number.isInteger);
     const mappedDigitByColumn = new Map((this.workspace.futureDigitMap || []).map(item => [item.column, item.digit]));
     const mappedDigitsByPosition = Array.from({ length: 5 }, (_, column) => mappedDigitByColumn.get(column) ?? null);
@@ -1044,7 +1121,7 @@ export class Cash5StudioApp {
             <span><b>${recommendationAvailable ? recommendation.primary.label : 'No available tens range'}</b><small>${recommendationAvailable ? `${recommendation.primary.confidence} · ${recommendation.primary.reason}` : 'Change another Ball filter or mapped ending'}</small></span>
             <button type="button" data-use-tens="${recommendation.primary.digit}" data-tens-position="${index}" aria-label="Use ${recommendation.primary.label} recommendation for Ball ${index + 1}" aria-pressed="${tensFilter === recommendation.primary.digit}" ${recommendationAvailable ? '' : 'disabled'}>${tensFilter === recommendation.primary.digit ? 'Using' : 'Use'}</button>
           </div>
-          <label class="slip-field-label">Tens range
+          <label class="slip-field-label">Tens range <em class="tens-source ${tensSources[index]}">${tensSources[index] === 'automatic' ? 'Auto' : tensSources[index] === 'manual' ? 'Manual' : ''}</em>
             <select class="tens-filter-select" data-slip-tens="${index}" aria-label="Tens range for Ball ${index + 1}">
               <option value="">Any tens</option>
               ${TENS_BANDS.map(band => {
@@ -1071,6 +1148,7 @@ export class Cash5StudioApp {
           const position = Number(select.dataset.slipTens);
           const tens = select.value === '' ? null : Number(select.value);
           this.workspace.slipTensFilters[position] = tens;
+          this.workspace.slipTensSources[position] = 'manual';
           const current = this.workspace.slipNumbers[position];
           if (Number.isInteger(current) && tens !== null && tensDigitForNumber(current) !== tens) this.workspace.slipNumbers[position] = null;
           this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
@@ -1083,6 +1161,7 @@ export class Cash5StudioApp {
           const position = Number(button.dataset.tensPosition);
           const tens = Number(button.dataset.useTens);
           this.workspace.slipTensFilters[position] = tens;
+          this.workspace.slipTensSources[position] = 'manual';
           const current = this.workspace.slipNumbers[position];
           if (Number.isInteger(current) && tensDigitForNumber(current) !== tens) this.workspace.slipNumbers[position] = null;
           this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
@@ -1150,7 +1229,12 @@ export class Cash5StudioApp {
           const row = this.workspace.draftRows.find(item => item.id === button.dataset.editRow);
           if (!row) return;
           this.workspace.slipNumbers = [...row.numbers];
-          this.workspace.slipTensFilters = [null, null, null, null, null];
+          this.workspace.slipTensFilters = Array.isArray(row.tensFilters) && row.tensFilters.length === 5
+            ? [...row.tensFilters]
+            : row.numbers.map(tensDigitForNumber);
+          this.workspace.slipTensSources = Array.isArray(row.tensSources) && row.tensSources.length === 5
+            ? [...row.tensSources]
+            : ['manual', 'manual', 'manual', 'manual', 'manual'];
           this.workspace.rowBuilder = [...row.numbers];
           this.workspace.draftRows = this.workspace.draftRows.filter(item => item.id !== row.id);
           this.renderCash5Workspace();
@@ -1180,8 +1264,9 @@ export class Cash5StudioApp {
       return;
     }
     const shareAvailable = typeof window.cash5StudioNativeShare === 'function';
+    const userRowCount = session.rows.filter(row => row.source !== 'system').length;
     this.finalizeSharePrompt.innerHTML = `
-      <div><strong>${session.rows.length} row${session.rows.length === 1 ? '' : 's'} finalized for the next draw.</strong><span>Your dated session is saved.</span></div>
+      <div><strong>${userRowCount} user line${userRowCount === 1 ? '' : 's'} saved with this prediction.</strong><span>The system ranks, pattern signals, and your choices are now dated together.</span></div>
       <div class="inline-actions">
         <button class="btn btn-primary" type="button" data-copy-finalized>Copy slips</button>
         ${shareAvailable ? '<button class="btn btn-secondary" type="button" data-share-finalized>Share…</button>' : ''}
@@ -1202,27 +1287,122 @@ export class Cash5StudioApp {
     if (!this.sessionHistory) return;
     const sessions = this.workspace.sessions;
     this.sessionHistory.classList.toggle('empty-state', sessions.length === 0);
-    this.sessionHistory.innerHTML = sessions.length ? sessions.map(session => `
-      <div class="session-card ${session.status}">
-        <div class="session-head"><strong>${escapeHTML(session.baselineDate)} → next draw</strong><span>${session.status}</span></div>
-        <div class="session-meta">Locked ${escapeHTML(new Date(session.finalizedAt).toLocaleString())} · ${session.rows.length} row${session.rows.length === 1 ? '' : 's'}</div>
-        <div class="session-rows">${session.rows.map((row, index) => `
-          <div class="session-row">
-            <strong>Row ${index + 1}</strong>
-            <div class="ticket-numbers">${row.numbers.map(number => `<span>${String(number).padStart(2, '0')}</span>`).join('')}</div>
-            ${row.note ? `<small>${escapeHTML(row.note)}</small>` : ''}
-          </div>`).join('')}</div>
-        ${session.result ? `
-          <div class="result-numbers">Result: ${session.result.numbers.join(' · ')}</div>
-          <div class="score-line">Rows: ${session.result.rowScores.map(score => `<b>${score.hits}/5</b>`).join(' ')}</div>
-        ` : '<div class="pending-result">Waiting for a newer imported or fetched drawing.</div>'}
-        <div class="session-actions">
-          <button class="mini-btn" data-copy-session="${escapeHTML(session.id)}">Copy for iMessage</button>
-          ${typeof window.cash5StudioNativeShare === 'function' ? `<button class="mini-btn" data-share-session="${escapeHTML(session.id)}">Share…</button>` : ''}
-          <button class="mini-btn" data-edit-session="${escapeHTML(session.id)}">${session.result ? 'Reuse in Ticket Builder' : 'Edit in Ticket Builder'}</button>
+    if (!sessions.length) {
+      this.sessionHistory.innerHTML = 'No saved sessions yet.';
+      return;
+    }
+
+    const percent = value => value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`;
+    const numberStrip = numbers => `<div class="ticket-numbers">${numbers.map(number => `<span>${String(number).padStart(2, '0')}</span>`).join('')}</div>`;
+    const summary = summarizePredictionHistory(sessions);
+    const scoredCount = sessions.filter(session => session.kind === 'prediction' && session.result).length;
+    const pendingCount = sessions.filter(session => session.kind === 'prediction' && !session.result).length;
+    const aggregateMarkup = `
+      <section class="ledger-overview">
+        <div class="ledger-overview-head">
+          <div><span class="eyebrow">Historical pattern agreement</span><strong>${scoredCount} scored drawing${scoredCount === 1 ? '' : 's'} · ${pendingCount} pending</strong></div>
+          <small>Match rates describe recorded outcomes, not next-draw probability.</small>
         </div>
-      </div>
-    `).join('') : 'No locked sessions yet.';
+        <div class="ledger-group-grid">${summary.groups.map(group => `
+          <article class="ledger-group">
+            <strong>${escapeHTML(group.label)}</strong>
+            ${group.trials ? `
+              <span><b>${percent(group.exactRate)}</b> exact number match</span>
+              <small>${group.exactHits}/${group.trials} exact · ${percent(group.endingRate)} endings · ${percent(group.tensRate)} tens · ${percent(group.missRate)} misses</small>
+            ` : '<small>No scored lines yet</small>'}
+          </article>`).join('')}</div>
+        <details class="pattern-scoreboard" ${summary.patterns.families.length ? '' : 'hidden'}>
+          <summary>Pattern shorthand scorecard</summary>
+          <div class="pattern-score-grid">${summary.patterns.families.map(item => `
+            <span title="${escapeHTML(item.label)}"><b>${escapeHTML(item.code)}</b><em>${item.hits}/${item.trials}</em><small>${percent(item.rate)} hit rate</small></span>
+          `).join('')}</div>
+          <h4>Arithmetic and movement variants</h4>
+          <div class="pattern-operation-grid">${summary.patterns.operations.map(item => `
+            <span><b>${escapeHTML(item.code)}</b><em>${item.hits}/${item.trials}</em><small>${percent(item.rate)}</small></span>
+          `).join('')}</div>
+          <p>Math suffixes: + addition · +M modulo-10 addition · −A absolute subtraction · −B borrowed subtraction.</p>
+        </details>
+      </section>`;
+
+    const sessionMarkup = session => {
+      const scoreByRow = new Map((session.result?.rowScores || []).map(score => [score.rowId, score]));
+      const signalScoreById = new Map((session.result?.patternSignalScores || []).map(score => [score.signalId, score]));
+      const userRows = session.rows.filter(row => row.source !== 'system' && row.available !== false);
+      const rowMarkup = session.rows.map((row, index) => {
+        const score = scoreByRow.get(row.id);
+        const title = row.source === 'system' ? `System Rank ${row.rank}` : `Your Line ${userRows.indexOf(row) + 1}`;
+        if (row.available === false) {
+          return `<article class="ledger-row unavailable">
+            <div class="ledger-row-head"><strong>${escapeHTML(title)}</strong><span>Unavailable</span></div>
+            <p>${escapeHTML(row.unavailableReason || 'Insufficient pattern support for this rank.')}</p>
+          </article>`;
+        }
+        const familyCodes = [...new Set((row.candidateEvidence || []).flatMap(item => (
+          (item.families || []).map(family => family.code)
+        )))];
+        const diagnostics = score?.positions?.length ? `<div class="position-diagnostics">${score.positions.map(item => {
+          const className = item.exact ? 'exact' : item.endingHit ? 'ending' : item.tensHit ? 'tens' : 'miss';
+          return `<span class="${className}" title="Ball ${item.column + 1}: selected ${item.selected}, actual ${item.actual} — ${escapeHTML(item.diagnostic)}"><b>B${item.column + 1}</b><em>${item.selected}→${item.actual}</em><small>${escapeHTML(item.diagnostic)}</small></span>`;
+        }).join('')}</div>` : '';
+        const scoredLabel = session.kind === 'prediction'
+          ? score?.available ? `${score.hits}/5 exact · ${percent(score.matchRate)} match / ${percent(score.missRate)} miss` : 'Pending'
+          : score ? `${score.hits}/5 winning numbers matched` : 'Pending';
+        return `<article class="ledger-row ${row.source === 'system' ? 'system' : 'user'}">
+          <div class="ledger-row-head">
+            <strong>${escapeHTML(title)}</strong>
+            <span>${scoredLabel}</span>
+          </div>
+          <div class="ledger-row-numbers">${numberStrip(row.numbers)}
+            ${session.kind === 'prediction' && score?.available ? `<div class="ledger-row-rates"><span>Endings <b>${score.endingHits}/5</b></span><span>Tens <b>${score.tensHits}/5</b></span></div>` : ''}
+          </div>
+          ${row.source === 'system' && familyCodes.length ? `<div class="row-pattern-codes"><small>Supporting families</small>${familyCodes.map(code => `<b>${escapeHTML(code)}</b>`).join('')}</div>` : ''}
+          ${row.note ? `<p>${escapeHTML(row.note)}</p>` : ''}
+          ${diagnostics}
+        </article>`;
+      }).join('');
+
+      const familyOutcomes = new Map();
+      (session.result?.patternSignalScores || []).forEach(item => {
+        const current = familyOutcomes.get(item.pattern) || { hits: 0, trials: 0 };
+        current.trials += 1;
+        if (item.hit) current.hits += 1;
+        familyOutcomes.set(item.pattern, current);
+      });
+      const patternSignals = session.patternSignals || [];
+      const patternMarkup = patternSignals.length ? `<details class="session-pattern-details">
+        <summary>Pattern signals · ${patternSignals.length} saved${session.result ? ` · ${[...familyOutcomes.values()].reduce((sum, item) => sum + item.hits, 0)} hit` : ''}</summary>
+        ${session.result ? `<div class="session-pattern-family-summary">${[...familyOutcomes.entries()].map(([family, outcome]) => `
+          <span><b>${escapeHTML(patternSignals.find(signal => signal.pattern === family)?.code?.split(':')[0] || family)}</b>${outcome.hits}/${outcome.trials}</span>
+        `).join('')}</div>` : ''}
+        <div class="session-signal-list">${patternSignals.map(signal => {
+          const outcome = signalScoreById.get(signal.id);
+          const state = !outcome ? 'pending' : outcome.hit ? 'win' : 'loss';
+          return `<span class="pattern-signal ${state}" title="${escapeHTML(`${signal.label || PATTERN_LABELS[signal.pattern] || signal.pattern}: ${signal.explanation}`)}">
+            <b>${escapeHTML(signal.code)}</b><em>B${signal.targetColumn + 1} → ${signal.digit}</em><small>${outcome ? `${outcome.actualDigit} actual · ${outcome.hit ? 'hit' : 'miss'}` : 'pending'}</small>
+          </span>`;
+        }).join('')}</div>
+      </details>` : '';
+
+      const resultMarkup = session.result ? `<div class="ledger-result">
+        <span>Actual · ${escapeHTML(session.result.date)}</span>${numberStrip(session.result.numbers)}
+      </div>` : '<div class="pending-result">Waiting for the next official <b>Update Draws</b> result.</div>';
+      const sessionDate = new Date(session.finalizedAt);
+      const lockedLabel = Number.isNaN(sessionDate.getTime()) ? session.baselineDate : sessionDate.toLocaleString();
+      const canEdit = userRows.length > 0;
+      return `<section class="session-card ${session.status} ${session.kind || 'legacy'}">
+        <div class="session-head"><strong>${escapeHTML(session.baselineDate)} → ${session.result ? escapeHTML(session.result.date) : 'next official draw'}</strong><span>${session.status}</span></div>
+        <div class="session-meta">${session.kind === 'prediction' ? `${session.historyDrawCount || 0}-draw evidence window` : `Locked ${escapeHTML(lockedLabel)}`} · ${session.rows.length} recorded line${session.rows.length === 1 ? '' : 's'}</div>
+        ${resultMarkup}
+        <div class="session-rows">${rowMarkup}</div>
+        ${patternMarkup}
+        <div class="session-actions">
+          <button class="mini-btn" data-copy-session="${escapeHTML(session.id)}">Copy lines</button>
+          ${typeof window.cash5StudioNativeShare === 'function' ? `<button class="mini-btn" data-share-session="${escapeHTML(session.id)}">Share…</button>` : ''}
+          ${canEdit ? `<button class="mini-btn" data-edit-session="${escapeHTML(session.id)}">${session.result ? 'Reuse your lines' : 'Edit your lines'}</button>` : ''}
+        </div>
+      </section>`;
+    };
+    this.sessionHistory.innerHTML = aggregateMarkup + sessions.map(sessionMarkup).join('');
     this.sessionHistory.querySelectorAll('[data-copy-session]').forEach(button => {
       button.addEventListener('click', async () => {
         const session = this.workspace.sessions.find(item => item.id === button.dataset.copySession);
@@ -1241,7 +1421,7 @@ export class Cash5StudioApp {
         this.saveToLocalStorage();
         this.setSessionsOpen?.(false);
         this.composerCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        this.showToast(wasScored ? 'Rows copied into Ticket Builder.' : 'Session unlocked in Ticket Builder. Edit and finalize it again when ready.');
+        this.showToast(wasScored ? 'Your saved lines were copied into Ticket Builder.' : 'Your pending lines are ready to edit. The system prediction remains locked.');
       });
     });
     this.sessionHistory.querySelectorAll('[data-share-session]').forEach(button => {
@@ -1283,7 +1463,7 @@ export class Cash5StudioApp {
   saveToLocalStorage() {
     const projectData = {
       appName: "Cash 5 Studio",
-      version: 3,
+      version: 4,
       draws: this.draws,
       manualLines: this.manualLines,
       workspace: this.workspace
@@ -1312,7 +1492,7 @@ export class Cash5StudioApp {
   exportProjectFile() {
     const project = {
       appName: "Cash 5 Studio",
-      version: 3,
+      version: 4,
       draws: this.draws,
       manualLines: this.manualLines,
       workspace: this.workspace
