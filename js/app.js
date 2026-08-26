@@ -2,8 +2,8 @@
 
 import { SAMPLE_CASH_5 } from './sampleData.js?v=3';
 import { parseCSV, autoMapColumns, convertRowsToDraws } from './csvParser.js';
-import { generateAutomatedPatterns } from './patternEngine.js';
-import { ConnectionEngine, normalizeManualConnectionChains } from './connectionEngine.js?v=5';
+import { generateAutomatedPatterns } from './patternEngine.js?v=5';
+import { ConnectionEngine, normalizeManualConnectionChains } from './connectionEngine.js?v=10';
 import { GridMatrix } from './gridMatrix.js?v=6';
 import { fetchLiveCash5Update } from './liveFetcher.js?v=4';
 import { validateProject, validateDraw, escapeHTML } from './validation.js?v=3';
@@ -14,6 +14,7 @@ import { classifyOnesHeat } from './onesAnalysis.js';
 import { createDraftRow, editSessionInBuilder, finalizeSession, formatSessionForMessage, scorePendingSessions } from './sessionStore.js?v=5';
 import { futureCellEvidence, rankHistoricalSuccessors, selectFutureDigit } from './futureWorkspace.js?v=4';
 import { buildDigitRepeatSummary } from './repeatSummary.js';
+import { rankPatternRecommendationsByColumn } from './patternRecommendations.js?v=2';
 import { hasAvailableOrderedSlip, recommendTensBands, TENS_BANDS, tensDigitForNumber } from './fuzzyTens.js?v=3';
 
 const INTERFACE_ZOOM_STEPS = [0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
@@ -64,6 +65,9 @@ export class Cash5StudioApp {
       showVerticalRuns: false,
       showDiagonalRuns: false,
       showMathematicalSequences: false,
+      showDiagonalMathematicalSequences: false,
+      showSisterOutputSequences: false,
+      showLPatterns: false,
       showTens: false,
       showOnes: true,
       linkBonusCurrentAndPrevOnly: false
@@ -111,6 +115,9 @@ export class Cash5StudioApp {
     this.chkVerticalRuns = document.getElementById("chkVerticalRuns");
     this.chkDiagonalRuns = document.getElementById("chkDiagonalRuns");
     this.chkMathematicalSequences = document.getElementById("chkMathematicalSequences");
+    this.chkDiagonalMathematicalSequences = document.getElementById("chkDiagonalMathematicalSequences");
+    this.chkSisterOutputSequences = document.getElementById("chkSisterOutputSequences");
+    this.chkLPatterns = document.getElementById("chkLPatterns");
     this.chkTens = document.getElementById("chkTens");
     this.chkOnes = document.getElementById("chkOnes");
     this.digitRepeatSummary = document.getElementById("digitRepeatSummary");
@@ -123,6 +130,7 @@ export class Cash5StudioApp {
     this.motifSelectionSummary = document.getElementById("motifSelectionSummary");
     this.futureMapCard = document.getElementById("futureMapCard");
     this.futureDigitGrid = document.getElementById("futureDigitGrid");
+    this.futureAllDigitGrid = document.getElementById("futureAllDigitGrid");
     this.futureMapInspector = document.getElementById("futureMapInspector");
     this.btnClearFutureMap = document.getElementById("btnClearFutureMap");
     this.btnJumpToSlip = document.getElementById("btnJumpToSlip");
@@ -347,6 +355,27 @@ export class Cash5StudioApp {
     if (this.chkMathematicalSequences) {
       this.chkMathematicalSequences.addEventListener("change", (e) => {
         this.patternSettings.showMathematicalSequences = e.target.checked;
+        this.updateState();
+      });
+    }
+
+    if (this.chkDiagonalMathematicalSequences) {
+      this.chkDiagonalMathematicalSequences.addEventListener("change", (e) => {
+        this.patternSettings.showDiagonalMathematicalSequences = e.target.checked;
+        this.updateState();
+      });
+    }
+
+    if (this.chkSisterOutputSequences) {
+      this.chkSisterOutputSequences.addEventListener("change", (e) => {
+        this.patternSettings.showSisterOutputSequences = e.target.checked;
+        this.updateState();
+      });
+    }
+
+    if (this.chkLPatterns) {
+      this.chkLPatterns.addEventListener("change", (e) => {
+        this.patternSettings.showLPatterns = e.target.checked;
         this.updateState();
       });
     }
@@ -709,10 +738,44 @@ export class Cash5StudioApp {
     const successorCandidates = new Map(successorRankings.flatMap(result => (
       result.candidates.map(candidate => [`${result.column}:${candidate.digit}`, { ...candidate, result }])
     )));
+    const patternRankings = rankPatternRecommendationsByColumn(this.researchDraws, 3);
+    const patternCandidates = new Map(patternRankings.flatMap(result => (
+      result.candidates.map(candidate => [`${result.column}:${candidate.digit}`, candidate])
+    )));
     this.gridMatrix?.setPositionHighlights(selections);
 
     if (this.futureDigitGrid) {
+      this.futureDigitGrid.classList.add('pattern-recommendation-grid');
       this.futureDigitGrid.innerHTML = `
+        <div class="future-grid-corner">Rank</div>
+        ${Array.from({ length: 5 }, (_, column) => `<div class="future-space-head">Ball ${column + 1}</div>`).join('')}
+        ${Array.from({ length: 3 }, (_, index) => {
+          const rank = index + 1;
+          return `
+          <div class="pattern-rank-label">#${rank}</div>
+          ${Array.from({ length: 5 }, (_, column) => {
+            const result = patternRankings.find(item => item.column === column);
+            const candidate = result?.candidates.find(item => item.rank === rank);
+            if (!candidate) return '<div class="pattern-recommendation-missing">—</div>';
+            const digit = candidate.digit;
+            const key = `${column}:${digit}`;
+            const mapped = mappedKeys.has(key);
+            const active = this.workspace.activeFutureCell?.column === column && this.workspace.activeFutureCell?.digit === digit;
+            const backtestText = candidate.walkForwardSufficient
+              ? `${Math.round(candidate.walkForwardRate * 100)}% walk-forward hit rate (${candidate.walkForwardHits} of ${candidate.walkForwardTrials})`
+              : `insufficient backtest sample (${candidate.walkForwardTrials} of 25 required trials)`;
+            const detail = `Rank ${rank} pattern recommendation for Ball ${column + 1}: ending ${digit}. Pattern score ${candidate.score} of 100; ${backtestText}.`;
+            return `<button class="pattern-recommendation-cell rank-${rank} ${mapped ? `mapped position-${column + 1}` : ''} ${active ? 'active' : ''}"
+              data-future-column="${column}" data-future-digit="${digit}" aria-pressed="${mapped}"
+              title="${escapeHTML(detail)}" aria-label="${escapeHTML(`Select ${detail}`)}">
+              <b>${digit}</b>
+            </button>`;
+          }).join('')}`;
+        }).join('')}`;
+    }
+
+    if (this.futureAllDigitGrid) {
+      this.futureAllDigitGrid.innerHTML = `
         <div class="future-grid-corner">Digit</div>
         ${Array.from({ length: 5 }, (_, column) => `<div class="future-space-head">Ball ${column + 1}</div>`).join('')}
         ${Array.from({ length: 10 }, (_, digit) => `
@@ -733,8 +796,10 @@ export class Cash5StudioApp {
               <b>${digit}</b>
             </button>`;
           }).join('')}`).join('')}`;
+    }
 
-      this.futureDigitGrid.querySelectorAll('[data-future-column]').forEach(button => {
+    [this.futureDigitGrid, this.futureAllDigitGrid].filter(Boolean).forEach(grid => {
+      grid.querySelectorAll('[data-future-column]').forEach(button => {
         button.addEventListener('click', () => {
           const column = Number(button.dataset.futureColumn);
           const digit = Number(button.dataset.futureDigit);
@@ -749,7 +814,7 @@ export class Cash5StudioApp {
           this.saveToLocalStorage();
         });
       });
-    }
+    });
 
     if (this.futureMapInspector) {
       const active = this.workspace.activeFutureCell;
@@ -760,10 +825,30 @@ export class Cash5StudioApp {
         const evidence = futureCellEvidence(this.researchDraws, this.workspace.motifMatches, active.column, active.digit);
         const isMapped = mappedKeys.has(`${active.column}:${active.digit}`);
         const successor = successorCandidates.get(`${active.column}:${active.digit}`);
+        const recommendation = patternCandidates.get(`${active.column}:${active.digit}`);
         const successorResult = successorRankings.find(result => result.column === active.column);
         const successorDetail = successor
           ? `<span class="successor-inspector-rank rank-${successor.rank}"><b>${successor.rank === 4 ? 'HM' : `#${successor.rank}`}</b> ${SUCCESSOR_RANK_LABELS[successor.rank - 1]}<br><small>${successor.count} of ${successorResult.totalTransitions} matching transitions · latest ${escapeHTML(successor.mostRecentTransitionDate)}</small></span>`
           : `<span><b>—</b> successor rank<br><small>${successorResult?.totalTransitions || 0} matching transitions</small></span>`;
+        const recommendationDetail = recommendation
+          ? `<span class="pattern-inspector-summary">
+              <b>#${recommendation.rank} · ${recommendation.score}/100 pattern score</b><br>
+              <small class="${recommendation.walkForwardSufficient ? 'pattern-backtest-sufficient' : 'pattern-backtest-limited'}">
+                ${recommendation.walkForwardSufficient
+                  ? `${Math.round(recommendation.walkForwardRate * 100)}% walk-forward hit rate · ${recommendation.walkForwardHits} of ${recommendation.walkForwardTrials} exact Ball outcomes`
+                  : `Insufficient backtest sample · ${recommendation.walkForwardTrials} of 25 required Ball-position trials`}
+              </small>
+            </span>`
+          : '';
+        const patternEvidence = recommendation
+          ? `<details open class="future-evidence-expander pattern-evidence-expander">
+              <summary>${recommendation.familyCount} supporting pattern ${recommendation.familyCount === 1 ? 'family' : 'families'} · ${recommendation.signalCount} signals</summary>
+              <ul class="pattern-support-list">${recommendation.families.map(family => `
+                <li><b>${escapeHTML(family.label)}</b><span>${Math.round(family.reliability * 100)}% smoothed signal precision</span>
+                  <small>${family.trials ? `${family.hits} of ${family.trials} historical signals hit` : 'No prior trials; Laplace-smoothed starting estimate'}${family.examples.length ? ` · ${family.examples.map(escapeHTML).join(' · ')}` : ''}</small>
+                </li>`).join('')}</ul>
+            </details>`
+          : '';
         this.futureMapInspector.innerHTML = `
           <div class="future-inspector-head">
             <div><span>Focused selection</span><h4>Digit ${active.digit} in Ball ${active.column + 1}</h4></div>
@@ -772,8 +857,10 @@ export class Cash5StudioApp {
           <div class="future-inspector-stats">
             <span><b>${evidence.windowCount}</b> times in this space<br><small>${this.researchDraws.length} research draws</small></span>
             <span><b>${evidence.motifCount}</b> pattern futures<br><small>after motif search</small></span>
+            ${recommendationDetail}
             ${successorDetail}
           </div>
+          ${patternEvidence}
           <details open class="future-evidence-expander">
             <summary>Full numbers ending in ${active.digit}</summary>
             <div class="future-full-number-grid">${evidence.fullNumbers.map(item => `

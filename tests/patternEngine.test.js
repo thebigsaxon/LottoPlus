@@ -34,7 +34,7 @@ test('patternEngine detects diagonal runs strictly for 1:1 diagonal column shift
     showOnes: true
   });
 
-  assert.ok(lines.every(l => l.style === 'dashed'));
+  assert.ok(lines.every(line => line.style === 'dashed'));
 });
 
 test('patternEngine keeps one connection per scenario for identical cell pairs', () => {
@@ -135,4 +135,92 @@ test('overlapping mathematical sequence chains use dashed group rectangles', () 
   const mathLines = lines.filter(line => line.patternType === 'math-sequence');
   assert.equal(mathLines.length, 2);
   assert.ok(mathLines.every(line => line.overlapsSequence && line.style === 'dashed'));
+});
+
+test('diagonal mathematical sequences move one column consistently across three draws', () => {
+  const draws = [
+    { id: 'd1', date: '2026-08-17', numbers: [3, 2, 4, 6, 7], bonus: null },
+    { id: 'd2', date: '2026-08-18', numbers: [9, 1, 5, 8, 6], bonus: null },
+    { id: 'd3', date: '2026-08-19', numbers: [2, 4, 1, 7, 9], bonus: null }
+  ];
+
+  const lines = generateAutomatedPatterns(draws, {
+    showMatches: false,
+    showMathematicalSequences: false,
+    showDiagonalMathematicalSequences: true,
+    showTens: false,
+    showOnes: true
+  });
+
+  const diagonalLines = lines.filter(line => line.patternType === 'math-diagonal-sequence');
+  assert.ok(diagonalLines.some(line => line.sequenceCellIds.join(',') === 'd1-b1-ones,d2-b2-ones,d3-b3-ones'));
+  assert.ok(diagonalLines.some(line => line.sequenceCellIds.join(',') === 'd1-b4-ones,d2-b3-ones,d3-b2-ones'));
+  assert.ok(diagonalLines.some(line => line.label.includes('2 + 5 = 7')));
+  assert.ok(diagonalLines.some(line => line.label.includes('8 − 7 = 1')));
+  assert.ok(diagonalLines.every(line => {
+    const columns = line.sequenceCellIds.map(cellId => Number(cellId.match(/-b(\d+)-/)[1]));
+    return columns[1] - columns[0] === columns[2] - columns[1]
+      && Math.abs(columns[1] - columns[0]) === 1;
+  }));
+});
+
+test('diagonal mathematical sequences remain off unless their overlay is enabled', () => {
+  const draws = [
+    { id: 'd1', date: '2026-08-17', numbers: [3, 2, 4, 6, 7], bonus: null },
+    { id: 'd2', date: '2026-08-18', numbers: [9, 1, 5, 8, 6], bonus: null },
+    { id: 'd3', date: '2026-08-19', numbers: [2, 4, 1, 7, 9], bonus: null }
+  ];
+  const lines = generateAutomatedPatterns(draws, {
+    showMatches: false,
+    showMathematicalSequences: true,
+    showDiagonalMathematicalSequences: false,
+    showTens: false,
+    showOnes: true
+  });
+
+  assert.ok(lines.every(line => line.patternType !== 'math-diagonal-sequence'));
+});
+
+test('sister-output sequences use two inline sources and a left or right output', () => {
+  const draws = [
+    { id: 'd1', date: '2026-08-17', numbers: [1, 2, 3], bonus: null },
+    { id: 'd2', date: '2026-08-18', numbers: [2, 2, 5], bonus: null },
+    { id: 'd3', date: '2026-08-19', numbers: [4, 8, 0], bonus: null }
+  ];
+  const lines = generateAutomatedPatterns(draws, {
+    showMatches: false,
+    showSisterOutputSequences: true,
+    showTens: false,
+    showOnes: true
+  });
+  const sisterOutputs = lines.filter(line => line.patternType === 'math-sister-output');
+
+  assert.ok(sisterOutputs.some(line => line.sequenceCellIds.join(',') === 'd1-b1-ones,d2-b1-ones,d3-b0-ones'));
+  assert.ok(sisterOutputs.some(line => line.sequenceCellIds.join(',') === 'd1-b2-ones,d2-b2-ones,d3-b1-ones'));
+  assert.ok(sisterOutputs.some(line => line.label.includes('2 + 2 = 4')));
+  assert.ok(sisterOutputs.some(line => line.label.includes('3 + 5 = 8')));
+  assert.ok(sisterOutputs.every(line => line.style === 'solid'
+    && line.opacity === 0.6
+    && line.renderThroughCells === true
+    && line.hideNodeRings === true));
+});
+
+test('L patterns use adjacent same-draw sources and output below either endpoint', () => {
+  const draws = [
+    { id: 'd1', date: '2026-08-17', numbers: [1, 2, 3], bonus: null },
+    { id: 'd2', date: '2026-08-18', numbers: [2, 2, 5], bonus: null },
+    { id: 'd3', date: '2026-08-19', numbers: [4, 8, 0], bonus: null }
+  ];
+  const lines = generateAutomatedPatterns(draws, {
+    showMatches: false,
+    showLPatterns: true,
+    showTens: false,
+    showOnes: true
+  });
+  const lPatterns = lines.filter(line => line.patternType === 'math-l-pattern');
+  const example = lPatterns.find(line => line.sequenceCellIds.join(',') === 'd2-b0-ones,d2-b1-ones,d3-b0-ones');
+
+  assert.ok(example);
+  assert.deepEqual(example.sequencePathCellIds, ['d2-b1-ones', 'd2-b0-ones', 'd3-b0-ones']);
+  assert.ok(example.label.includes('2 + 2 = 4'));
 });

@@ -18,7 +18,7 @@ export const LINE_COLOR_PALETTE = [
   "#9b4f62"
 ];
 
-export const AUTO_PATTERN_ORDER = ['match', 'vertical', 'sister', 'math-sequence'];
+export const AUTO_PATTERN_ORDER = ['match', 'vertical', 'sister', 'math-diagonal-sequence', 'math-sister-output', 'math-l-pattern', 'math-sequence'];
 const AUTO_RING_SPACING = 5;
 const AUTO_LINE_SPACING = 6;
 
@@ -27,6 +27,9 @@ export function automatedPatternType(line) {
   const id = String(line?.id || '');
   if (id.startsWith('auto-vrun-')) return 'vertical';
   if (id.startsWith('auto-diag-')) return 'sister';
+  if (id.startsWith('auto-math-diag-')) return 'math-diagonal-sequence';
+  if (id.startsWith('auto-math-sister-output-')) return 'math-sister-output';
+  if (id.startsWith('auto-math-l-')) return 'math-l-pattern';
   if (id.startsWith('auto-math-')) return 'math-sequence';
   return 'match';
 }
@@ -39,12 +42,20 @@ function patternSort(a, b) {
     || a.localeCompare(b);
 }
 
+function isBoxedMathematicalPattern(line) {
+  const patternType = automatedPatternType(line);
+  return patternType === 'math-sequence' || patternType === 'math-l-pattern';
+}
+
 export function buildAutoRingLayout(lines = []) {
   const patternsByCell = new Map();
 
-  lines.filter(line => line.isAuto && automatedPatternType(line) !== 'math-sequence').forEach(line => {
+  lines.filter(line => line.isAuto && !isBoxedMathematicalPattern(line) && !line.hideNodeRings).forEach(line => {
     const patternType = automatedPatternType(line);
-    [line.fromCellId, line.toCellId].forEach(cellId => {
+    const cellIds = Array.isArray(line.sequenceCellIds) && line.sequenceCellIds.length
+      ? line.sequenceCellIds
+      : [line.fromCellId, line.toCellId];
+    cellIds.forEach(cellId => {
       if (!patternsByCell.has(cellId)) patternsByCell.set(cellId, new Set());
       patternsByCell.get(cellId).add(patternType);
     });
@@ -63,7 +74,7 @@ export function buildAutoPairOffsets(lines = []) {
   const patternsByPair = new Map();
   const pairKey = line => [line.fromCellId, line.toCellId].sort().join(':');
 
-  lines.filter(line => line.isAuto && automatedPatternType(line) !== 'math-sequence').forEach(line => {
+  lines.filter(line => line.isAuto && !isBoxedMathematicalPattern(line)).forEach(line => {
     const key = pairKey(line);
     if (!patternsByPair.has(key)) patternsByPair.set(key, new Set());
     patternsByPair.get(key).add(automatedPatternType(line));
@@ -158,6 +169,64 @@ export function browserRectToSvgSpace(rect, svgRect, coordinateWidth, coordinate
     width: rect.width / scaleX,
     height: rect.height / scaleY
   };
+}
+
+export function lPatternOutlinePoints(rects, outputSide, padding = 5) {
+  if (!Array.isArray(rects) || rects.length !== 3) return [];
+  const [leftSource, rightSource, output] = rects;
+  const minX = Math.min(leftSource.left, rightSource.left, output.left) - padding;
+  const minY = Math.min(leftSource.top, rightSource.top, output.top) - padding;
+  const maxX = Math.max(leftSource.right, rightSource.right, output.right) + padding;
+  const maxY = Math.max(leftSource.bottom, rightSource.bottom, output.bottom) + padding;
+  const sourceBottom = Math.max(leftSource.bottom, rightSource.bottom) + padding;
+
+  if (outputSide === 'right') {
+    const legLeft = Math.min(rightSource.left, output.left) - padding;
+    return [
+      { x: minX, y: minY },
+      { x: maxX, y: minY },
+      { x: maxX, y: maxY },
+      { x: legLeft, y: maxY },
+      { x: legLeft, y: sourceBottom },
+      { x: minX, y: sourceBottom }
+    ];
+  }
+
+  const legRight = Math.max(leftSource.right, output.right) + padding;
+  return [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: maxX, y: sourceBottom },
+    { x: legRight, y: sourceBottom },
+    { x: legRight, y: maxY },
+    { x: minX, y: maxY }
+  ];
+}
+
+export function roundedPolygonPath(points, radius = 10) {
+  if (!Array.isArray(points) || points.length < 3) return '';
+  const corners = points.map((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length];
+    const next = points[(index + 1) % points.length];
+    const previousDistance = Math.hypot(previous.x - point.x, previous.y - point.y);
+    const nextDistance = Math.hypot(next.x - point.x, next.y - point.y);
+    const cornerRadius = Math.min(radius, previousDistance / 2, nextDistance / 2);
+    return {
+      point,
+      entry: {
+        x: point.x + ((previous.x - point.x) / previousDistance) * cornerRadius,
+        y: point.y + ((previous.y - point.y) / previousDistance) * cornerRadius
+      },
+      exit: {
+        x: point.x + ((next.x - point.x) / nextDistance) * cornerRadius,
+        y: point.y + ((next.y - point.y) / nextDistance) * cornerRadius
+      }
+    };
+  });
+
+  return corners.map(({ point, entry, exit }, index) =>
+    `${index === 0 ? 'M' : 'L'} ${entry.x} ${entry.y} Q ${point.x} ${point.y} ${exit.x} ${exit.y}`
+  ).join(' ') + ' Z';
 }
 
 export class ConnectionEngine {
@@ -368,7 +437,7 @@ export class ConnectionEngine {
     const autoPairOffsets = buildAutoPairOffsets(this.lines);
 
     this.lines
-      .filter(line => line.isAuto && automatedPatternType(line) === 'math-sequence')
+      .filter(line => line.isAuto && isBoxedMathematicalPattern(line))
       .forEach(sequence => {
         const container = this.gridTable || document.getElementById("gridContainer");
         const searchRoot = container || document;
@@ -391,27 +460,36 @@ export class ConnectionEngine {
         const maxY = Math.max(...rects.map(rect => rect.bottom)) + padding;
         const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
         group.dataset.lineId = sequence.id;
-        const box = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        box.setAttribute("x", minX);
-        box.setAttribute("y", minY);
-        box.setAttribute("width", maxX - minX);
-        box.setAttribute("height", maxY - minY);
-        box.setAttribute("rx", "10");
-        box.setAttribute("fill", "rgba(110, 231, 183, 0.06)");
-        box.setAttribute("stroke", renderedConnectionColor(sequence.color));
-        box.setAttribute("stroke-width", "2.5");
-        box.setAttribute("vector-effect", "non-scaling-stroke");
-        if (sequence.overlapsSequence) box.setAttribute("stroke-dasharray", "7 5");
-        box.style.pointerEvents = "none";
+        const isLPattern = automatedPatternType(sequence) === 'math-l-pattern';
+        const outline = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          isLPattern ? "path" : "rect"
+        );
+        if (isLPattern) {
+          const points = lPatternOutlinePoints(rects, sequence.sequenceDirection, padding);
+          outline.setAttribute("d", roundedPolygonPath(points, 10));
+        } else {
+          outline.setAttribute("x", minX);
+          outline.setAttribute("y", minY);
+          outline.setAttribute("width", maxX - minX);
+          outline.setAttribute("height", maxY - minY);
+          outline.setAttribute("rx", "10");
+        }
+        outline.setAttribute("fill", "rgba(110, 231, 183, 0.06)");
+        outline.setAttribute("stroke", renderedConnectionColor(sequence.color));
+        outline.setAttribute("stroke-width", "2.5");
+        outline.setAttribute("vector-effect", "non-scaling-stroke");
+        if (sequence.overlapsSequence) outline.setAttribute("stroke-dasharray", "7 5");
+        outline.style.pointerEvents = "none";
         const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
         title.textContent = sequence.label;
-        box.appendChild(title);
-        group.appendChild(box);
+        outline.appendChild(title);
+        group.appendChild(outline);
         this.svg.appendChild(group);
       });
 
     this.lines.forEach((line, lineIndex) => {
-      if (line.isAuto && automatedPatternType(line) === 'math-sequence') return;
+      if (line.isAuto && isBoxedMathematicalPattern(line)) return;
       const start = this.getCellCenter(line.fromCellId);
       const end = this.getCellCenter(line.toCellId);
       if (!start || !end) return;
@@ -420,12 +498,17 @@ export class ConnectionEngine {
       const endRing = autoRingLayout.get(`${patternType}:${line.toCellId}`);
       const ringRadius = (point, layout) => point.radius
         + (line.isAuto ? 1.5 + (layout?.index || 0) * AUTO_RING_SPACING : 0);
-      const pathPoints = trimConnectionToRings(
-        { ...start, radius: ringRadius(start, startRing) },
-        { ...end, radius: ringRadius(end, endRing) }
-      );
+      const pathPoints = line.renderThroughCells
+        ? { start: { ...start }, end: { ...end } }
+        : trimConnectionToRings(
+          { ...start, radius: ringRadius(start, startRing) },
+          { ...end, radius: ringRadius(end, endRing) }
+        );
       const pathStart = pathPoints.start;
       const pathEnd = pathPoints.end;
+      const sequencePathPoints = (line.sequencePathCellIds || [])
+        .map(cellId => this.getCellCenter(cellId))
+        .filter(Boolean);
       const baseLineColor = visibleConnectionColor(line.color);
       const lineColor = renderedConnectionColor(line.color);
       const pairKey = [line.fromCellId, line.toCellId].sort().join(':');
@@ -445,7 +528,10 @@ export class ConnectionEngine {
       const normalY = dx / distance;
       let dStr = `M ${pathStart.x} ${pathStart.y} L ${pathEnd.x} ${pathEnd.y}`;
 
-      if (Math.abs(dy) > 50 && Math.abs(dx) > 20) {
+      if (sequencePathPoints.length > 2) {
+        const routedPoints = [pathStart, ...sequencePathPoints.slice(1, -1), pathEnd];
+        dStr = routedPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+      } else if (Math.abs(dy) > 50 && Math.abs(dx) > 20) {
         const cx1 = pathStart.x + normalX * parallelOffset;
         const cy1 = pathStart.y + dy * 0.4 + normalY * parallelOffset;
         const cx2 = pathEnd.x + normalX * parallelOffset;
@@ -459,48 +545,52 @@ export class ConnectionEngine {
 
       path.setAttribute("d", dStr);
       path.setAttribute("stroke", lineColor);
-      if (!line.isAuto) path.setAttribute("stroke-opacity", "0.7");
+      if (Number.isFinite(Number(line.opacity))) path.setAttribute("stroke-opacity", String(line.opacity));
+      else if (!line.isAuto) path.setAttribute("stroke-opacity", "0.7");
       path.setAttribute("stroke-width", line.isAuto ? "2.5" : "4.5");
       path.setAttribute("fill", "none");
       path.setAttribute("stroke-linecap", line.isAuto ? "round" : "butt");
 
       // Keep skipped-row connectors visually beneath any number cell they cross.
-      const maskId = `connector-mask-${lineIndex}`;
-      const mask = document.createElementNS("http://www.w3.org/2000/svg", "mask");
-      mask.setAttribute("id", maskId);
-      mask.setAttribute("maskUnits", "userSpaceOnUse");
-      mask.setAttribute("x", "0");
-      mask.setAttribute("y", "0");
-      mask.setAttribute("width", this.svg.getAttribute("width") || "100%");
-      mask.setAttribute("height", this.svg.getAttribute("height") || "100%");
-      const maskBase = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      maskBase.setAttribute("x", "0");
-      maskBase.setAttribute("y", "0");
-      maskBase.setAttribute("width", "100%");
-      maskBase.setAttribute("height", "100%");
-      maskBase.setAttribute("fill", "white");
-      mask.appendChild(maskBase);
+      let maskId = null;
+      if (!line.renderThroughCells) {
+        maskId = `connector-mask-${lineIndex}`;
+        const mask = document.createElementNS("http://www.w3.org/2000/svg", "mask");
+        mask.setAttribute("id", maskId);
+        mask.setAttribute("maskUnits", "userSpaceOnUse");
+        mask.setAttribute("x", "0");
+        mask.setAttribute("y", "0");
+        mask.setAttribute("width", this.svg.getAttribute("width") || "100%");
+        mask.setAttribute("height", this.svg.getAttribute("height") || "100%");
+        const maskBase = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        maskBase.setAttribute("x", "0");
+        maskBase.setAttribute("y", "0");
+        maskBase.setAttribute("width", "100%");
+        maskBase.setAttribute("height", "100%");
+        maskBase.setAttribute("fill", "white");
+        mask.appendChild(maskBase);
 
-      const container = this.gridTable || document.getElementById("gridContainer");
-      const svgRect = this.svg.getBoundingClientRect();
-      const coordinateWidth = Number(this.svg.getAttribute('width')) || this.svg.clientWidth || svgRect.width;
-      const coordinateHeight = Number(this.svg.getAttribute('height')) || this.svg.clientHeight || svgRect.height;
-      Array.from((container || document).querySelectorAll(".square-cell[data-cell-id]"))
-        .filter(cell => cell.dataset.cellId !== String(line.fromCellId)
-          && cell.dataset.cellId !== String(line.toCellId))
-        .forEach(cell => {
-          const rect = browserRectToSvgSpace(cell.getBoundingClientRect(), svgRect, coordinateWidth, coordinateHeight);
-          const cutout = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-          cutout.setAttribute("x", rect.left - 1);
-          cutout.setAttribute("y", rect.top - 1);
-          cutout.setAttribute("width", rect.width + 2);
-          cutout.setAttribute("height", rect.height + 2);
-          cutout.setAttribute("rx", "7");
-          cutout.setAttribute("fill", "black");
-          mask.appendChild(cutout);
-        });
-      this.svg.querySelector("defs")?.appendChild(mask);
-      path.setAttribute("mask", `url(#${maskId})`);
+        const container = this.gridTable || document.getElementById("gridContainer");
+        const svgRect = this.svg.getBoundingClientRect();
+        const coordinateWidth = Number(this.svg.getAttribute('width')) || this.svg.clientWidth || svgRect.width;
+        const coordinateHeight = Number(this.svg.getAttribute('height')) || this.svg.clientHeight || svgRect.height;
+        Array.from((container || document).querySelectorAll(".square-cell[data-cell-id]"))
+          .filter(cell => cell.dataset.cellId !== String(line.fromCellId)
+            && cell.dataset.cellId !== String(line.toCellId))
+          .forEach(cell => {
+            const rect = browserRectToSvgSpace(cell.getBoundingClientRect(), svgRect, coordinateWidth, coordinateHeight);
+            const cutout = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            cutout.setAttribute("x", rect.left - 1);
+            cutout.setAttribute("y", rect.top - 1);
+            cutout.setAttribute("width", rect.width + 2);
+            cutout.setAttribute("height", rect.height + 2);
+            cutout.setAttribute("rx", "7");
+            cutout.setAttribute("fill", "black");
+            mask.appendChild(cutout);
+          });
+        this.svg.querySelector("defs")?.appendChild(mask);
+        path.setAttribute("mask", `url(#${maskId})`);
+      }
 
       path.style.pointerEvents = "none";
       path.style.cursor = "default";
@@ -561,10 +651,18 @@ export class ConnectionEngine {
         pathGroup.appendChild(deleteHit);
       }
 
-      [
-          { point: start, cellId: line.fromCellId },
-          { point: end, cellId: line.toCellId }
-        ].forEach(({ point, cellId }) => {
+      if (line.hideNodeRings) {
+        this.svg.appendChild(pathGroup);
+        return;
+      }
+
+      const ringCellIds = Array.isArray(line.sequenceCellIds) && line.sequenceCellIds.length
+        ? line.sequenceCellIds
+        : [line.fromCellId, line.toCellId];
+      ringCellIds
+        .map(cellId => ({ point: this.getCellCenter(cellId), cellId }))
+        .filter(({ point }) => Boolean(point))
+        .forEach(({ point, cellId }) => {
           const layout = autoRingLayout.get(`${patternType}:${cellId}`);
           const ringKey = line.isAuto
             ? `auto:${patternType}:${cellId}`

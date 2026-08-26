@@ -15,7 +15,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=11">
+  <link rel="stylesheet" href="css/styles.css?v=13">
 </head>
 <body>
   <header class="app-toolbar">
@@ -86,6 +86,9 @@
                 <label><input type="checkbox" id="chkVerticalRuns"><i class="legend-dot vertical"></i><span>Same-column runs</span></label>
                 <label><input type="checkbox" id="chkDiagonalRuns"><i class="legend-dot sister"></i><span>Left/right sister shifts</span></label>
                 <label><input type="checkbox" id="chkMathematicalSequences"><i class="legend-dot math"></i><span>Three-draw sequences</span></label>
+                <label><input type="checkbox" id="chkDiagonalMathematicalSequences"><i class="legend-dot math-diagonal"></i><span>Three-draw diagonal sequences</span></label>
+                <label><input type="checkbox" id="chkSisterOutputSequences"><i class="legend-dot math-sister-output"></i><span>Three-draw sister outputs</span></label>
+                <label><input type="checkbox" id="chkLPatterns"><i class="legend-dot math-l"></i><span>L-pattern sequences</span></label>
                 <hr>
                 <label><input type="checkbox" id="chkTens"><span>Show tens reference</span></label>
                 <input type="checkbox" id="chkOnes" checked disabled hidden>
@@ -130,15 +133,25 @@
           <div><span class="eyebrow">Plan by position</span><h2>Next Draw Board</h2></div>
           <div class="surface-actions"><button class="text-btn" id="btnClearFutureMap" type="button">Clear board</button><button class="btn btn-secondary" id="btnJumpToSlip" type="button">Build slip ↓</button></div>
         </header>
-        <p class="surface-intro">The latest 50 draws rank which ones digits historically followed the present digit in each Ball position. Map any digit to keep building your own selection.</p>
+        <p class="surface-intro">The top three endings in each Ball are ranked from all seven pattern families across up to 50 draws. Scores and walk-forward rates describe historical pattern performance, not the probability of a random lottery result.</p>
           <div class="future-map-legend" aria-label="Next draw board legend">
             <span><i class="intuition"></i>Mapped selection</span>
             <span><i class="successor-rank-1"></i>#1</span>
             <span><i class="successor-rank-2"></i>#2</span>
             <span><i class="successor-rank-3"></i>#3</span>
-            <span><i class="successor-rank-4"></i>Honorable mention</span>
           </div>
         <div id="futureDigitGrid" class="future-digit-grid"></div>
+        <details class="all-digits-disclosure" id="allDigitsDisclosure">
+          <summary>Show all digits</summary>
+          <p>Historical successor colors show which endings followed the latest digit in the same Ball position.</p>
+          <div class="future-map-legend compact" aria-label="Historical successor legend">
+            <span><i class="successor-rank-1"></i>#1</span>
+            <span><i class="successor-rank-2"></i>#2</span>
+            <span><i class="successor-rank-3"></i>#3</span>
+            <span><i class="successor-rank-4"></i>Honorable mention</span>
+          </div>
+          <div id="futureAllDigitGrid" class="future-digit-grid all-digit-grid"></div>
+        </details>
         <div id="futureMapInspector" class="future-map-inspector empty-state">Choose a digit and position to inspect its recent context.</div>
       </article>
     </section>
@@ -206,6 +219,6 @@
   </aside>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  <script type="module" src="js/app.js?v=17"></script>
+  <script type="module" src="js/app.js?v=25"></script>
 </body>
 </html>

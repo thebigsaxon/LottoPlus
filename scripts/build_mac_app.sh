@@ -50,3 +50,15 @@ EOF
 touch "$OUTPUT_DIR/$APP_NAME"
 
 echo "Packaged $OUTPUT_DIR/$APP_NAME"
+
+# Keep the original launcher current for users who still open LottoPlus.app.
+# Its executable and bundle identifier stay untouched so existing WebKit data
+# and saved workspaces continue to belong to the same application.
+LEGACY_APP="$OUTPUT_DIR/LottoPlus.app"
+if [ -d "$LEGACY_APP/Contents/Resources" ]; then
+    cp index.html "$LEGACY_APP/Contents/Resources/index.html"
+    cp -R css "$LEGACY_APP/Contents/Resources/"
+    cp -R js "$LEGACY_APP/Contents/Resources/"
+    touch "$LEGACY_APP"
+    echo "Updated legacy launcher $LEGACY_APP"
+fi

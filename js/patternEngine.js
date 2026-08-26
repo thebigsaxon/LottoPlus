@@ -8,6 +8,9 @@ export function generateAutomatedPatterns(draws, settings = {}) {
     showVerticalRuns = false,
     showDiagonalRuns = false,
     showMathematicalSequences = false,
+    showDiagonalMathematicalSequences = false,
+    showSisterOutputSequences = false,
+    showLPatterns = false,
     showTens = true,
     showOnes = true,
     colorMatch = "#187458",
@@ -75,28 +78,28 @@ export function generateAutomatedPatterns(draws, settings = {}) {
   // 2. SISTER RUNS: The same digit shifts exactly one column between consecutive rows.
   if (showDiagonalRuns) {
     for (let r = 0; r < gridRows.length - 1; r++) {
-        gridRows[r].forEach(cellA => {
-          gridRows[r + 1].forEach(cellB => {
-            const colDelta = Math.abs(cellA.colIndex - cellB.colIndex);
-            if (cellA.digit === cellB.digit && colDelta === 1) {
-              const pairKey = getScenarioPairKey('sister', cellA.id, cellB.id);
-              if (!createdScenarioPairs.has(pairKey)) {
-                createdScenarioPairs.add(pairKey);
-                lines.push({
-                  id: `auto-diag-${cellA.id}-${cellB.id}`,
-                  fromCellId: cellA.id,
-                  toCellId: cellB.id,
-                  color: colorDiagonal,
-                  style: "dashed",
-                  isArrow: false,
-                  label: `Sister Shift: ${cellA.digit}`,
-                  patternType: 'sister',
-                  isAuto: true
-                });
-              }
+      gridRows[r].forEach(cellA => {
+        gridRows[r + 1].forEach(cellB => {
+          const colDelta = Math.abs(cellA.colIndex - cellB.colIndex);
+          if (cellA.digit === cellB.digit && colDelta === 1) {
+            const pairKey = getScenarioPairKey('sister', cellA.id, cellB.id);
+            if (!createdScenarioPairs.has(pairKey)) {
+              createdScenarioPairs.add(pairKey);
+              lines.push({
+                id: `auto-diag-${cellA.id}-${cellB.id}`,
+                fromCellId: cellA.id,
+                toCellId: cellB.id,
+                color: colorDiagonal,
+                style: "dashed",
+                isArrow: false,
+                label: `Sister Shift: ${cellA.digit}`,
+                patternType: 'sister',
+                isAuto: true
+              });
             }
-          });
+          }
         });
+      });
     }
   }
 
@@ -156,36 +159,107 @@ export function generateAutomatedPatterns(draws, settings = {}) {
     }
   }
 
-  // 4. MATHEMATICAL SEQUENCES: Three consecutive digits in the same visible
-  // column, where the third is produced by the first two using addition,
-  // subtraction, or subtraction after adding 10 to either digit.
-  if (showMathematicalSequences) {
+  // 4. MATHEMATICAL SEQUENCES: Three consecutive digits where the third is
+  // produced by the first two using addition, subtraction, or subtraction
+  // after adding 10 to either digit. Sequences can run straight down one
+  // visible column, diagonally, into a sister column, or around an L shape.
+  if (showMathematicalSequences || showDiagonalMathematicalSequences || showSisterOutputSequences || showLPatterns) {
     const sequences = [];
+    const orientations = [];
+    if (showMathematicalSequences) {
+      orientations.push({ middleDelta: 0, outputDelta: 0, direction: null, patternType: 'math-sequence' });
+    }
+    if (showDiagonalMathematicalSequences) {
+      orientations.push(
+        { middleDelta: -1, outputDelta: -2, direction: 'left', patternType: 'math-diagonal-sequence' },
+        { middleDelta: 1, outputDelta: 2, direction: 'right', patternType: 'math-diagonal-sequence' }
+      );
+    }
+    if (showSisterOutputSequences) {
+      orientations.push(
+        { middleDelta: 0, outputDelta: -1, direction: 'left', patternType: 'math-sister-output' },
+        { middleDelta: 0, outputDelta: 1, direction: 'right', patternType: 'math-sister-output' }
+      );
+    }
+
     for (let r = 0; r < gridRows.length - 2; r++) {
       gridRows[r].forEach(cellA => {
-        const cellB = gridRows[r + 1].find(cell => cell.colIndex === cellA.colIndex);
-        const cellC = gridRows[r + 2].find(cell => cell.colIndex === cellA.colIndex);
-        if (!cellB || !cellC) return;
+        orientations.forEach(({ middleDelta, outputDelta, direction, patternType }) => {
+          const cellB = gridRows[r + 1].find(cell => cell.colIndex === cellA.colIndex + middleDelta);
+          const cellC = gridRows[r + 2].find(cell => cell.colIndex === cellA.colIndex + outputDelta);
+          if (!cellB || !cellC) return;
 
-        const relationship = mathematicalSequenceRelationships(cellA.digit, cellB.digit)
-          .find(item => item.result === cellC.digit);
-        if (!relationship) return;
+          const relationship = mathematicalSequenceRelationships(cellA.digit, cellB.digit)
+            .find(item => item.result === cellC.digit);
+          if (!relationship) return;
 
-        const label = `Mathematical sequence: ${cellA.digit}, ${cellB.digit}, ${cellC.digit} (${relationship.explanation})`;
-        sequences.push({
-          id: `auto-math-${cellA.id}-${cellB.id}-${cellC.id}`,
-          fromCellId: cellA.id,
-          toCellId: cellC.id,
-          sequenceCellIds: [cellA.id, cellB.id, cellC.id],
-          color: colorMathematical,
-          style: "solid",
-          isArrow: false,
-          label,
-          patternType: 'math-sequence',
-          isAuto: true,
-          overlapsSequence: false
+          const isSisterOutput = patternType === 'math-sister-output';
+          const prefix = isSisterOutput
+            ? `Sister-output mathematical sequence (${direction})`
+            : (direction ? `Diagonal mathematical sequence (${direction})` : 'Mathematical sequence');
+          const idPrefix = isSisterOutput
+            ? `auto-math-sister-output-${direction}`
+            : (direction ? `auto-math-diag-${direction}` : 'auto-math');
+          sequences.push({
+            id: `${idPrefix}-${cellA.id}-${cellB.id}-${cellC.id}`,
+            fromCellId: cellA.id,
+            toCellId: cellC.id,
+            sequenceCellIds: [cellA.id, cellB.id, cellC.id],
+            sequencePathCellIds: patternType === 'math-sequence' ? null : [cellA.id, cellB.id, cellC.id],
+            color: colorMathematical,
+            style: "solid",
+            opacity: isSisterOutput ? 0.6 : undefined,
+            renderThroughCells: isSisterOutput,
+            hideNodeRings: isSisterOutput,
+            isArrow: false,
+            label: `${prefix}: ${cellA.digit}, ${cellB.digit}, ${cellC.digit} (${relationship.explanation})`,
+            patternType,
+            sequenceDirection: direction || 'vertical',
+            isAuto: true,
+            overlapsSequence: false
+          });
         });
       });
+    }
+
+    // L PATTERNS: Two adjacent sources in one draw produce a result directly
+    // below either source in the following draw.
+    if (showLPatterns) {
+      for (let r = 0; r < gridRows.length - 1; r++) {
+        gridRows[r].forEach(cellA => {
+          const cellB = gridRows[r].find(cell => cell.colIndex === cellA.colIndex + 1);
+          if (!cellB) return;
+
+          [
+            { outputColumn: cellA.colIndex, outputSide: 'left' },
+            { outputColumn: cellB.colIndex, outputSide: 'right' }
+          ].forEach(({ outputColumn, outputSide }) => {
+            const cellC = gridRows[r + 1].find(cell => cell.colIndex === outputColumn);
+            if (!cellC) return;
+            const relationship = mathematicalSequenceRelationships(cellA.digit, cellB.digit)
+              .find(item => item.result === cellC.digit);
+            if (!relationship) return;
+
+            sequences.push({
+              id: `auto-math-l-${outputSide}-${cellA.id}-${cellB.id}-${cellC.id}`,
+              fromCellId: outputSide === 'left' ? cellB.id : cellA.id,
+              toCellId: cellC.id,
+              sequenceCellIds: [cellA.id, cellB.id, cellC.id],
+              sequencePathCellIds: outputSide === 'left'
+                ? [cellB.id, cellA.id, cellC.id]
+                : [cellA.id, cellB.id, cellC.id],
+              color: colorMathematical,
+              style: 'solid',
+              isArrow: false,
+              label: `L-pattern mathematical sequence (${outputSide} output): ${cellA.digit}, ${cellB.digit}, ${cellC.digit} (${relationship.explanation})`,
+              patternType: 'math-l-pattern',
+              sequenceDirection: outputSide,
+              isAuto: true,
+              overlapsSequence: false
+            });
+          });
+        });
+      }
     }
 
     for (let i = 0; i < sequences.length; i += 1) {
@@ -197,7 +271,9 @@ export function generateAutomatedPatterns(draws, settings = {}) {
       }
     }
     sequences.forEach(sequence => {
-      sequence.style = sequence.overlapsSequence ? 'dashed' : 'solid';
+      sequence.style = sequence.patternType === 'math-sister-output'
+        ? 'solid'
+        : (sequence.overlapsSequence ? 'dashed' : 'solid');
       lines.push(sequence);
     });
   }

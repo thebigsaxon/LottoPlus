@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { browserRectToSvgSpace, buildAutoPairOffsets, buildAutoRingLayout, ConnectionEngine, isConnectionTool, LINE_COLOR_PALETTE, normalizeManualConnectionChains, shouldEndConnectionChain, trimConnectionToRings, visibleConnectionColor } from '../js/connectionEngine.js';
+import { browserRectToSvgSpace, buildAutoPairOffsets, buildAutoRingLayout, ConnectionEngine, isConnectionTool, LINE_COLOR_PALETTE, lPatternOutlinePoints, normalizeManualConnectionChains, roundedPolygonPath, shouldEndConnectionChain, trimConnectionToRings, visibleConnectionColor } from '../js/connectionEngine.js';
 
 test('Present endpoints complete a connection chain', () => {
   assert.equal(shouldEndConnectionChain('present'), true);
@@ -162,4 +162,63 @@ test('overlapping automatic scenarios get concentric rings and separated paths',
   assert.deepEqual(rings.get('vertical:a'), { index: 1, count: 2 });
   assert.equal(offsets.get('match:a:b'), -3);
   assert.equal(offsets.get('vertical:a:b'), 3);
+});
+
+test('boxed L-pattern shapes do not also allocate line endpoint rings', () => {
+  const rings = buildAutoRingLayout([
+    {
+      id: 'auto-math-l-left-a-b-c',
+      fromCellId: 'b',
+      toCellId: 'c',
+      sequenceCellIds: ['a', 'b', 'c'],
+      patternType: 'math-l-pattern',
+      isAuto: true
+    }
+  ]);
+
+  assert.equal(rings.size, 0);
+});
+
+test('three-draw sister-output paths do not allocate endpoint rings', () => {
+  const rings = buildAutoRingLayout([
+    {
+      id: 'auto-math-sister-output-right-a-b-c',
+      fromCellId: 'a',
+      toCellId: 'c',
+      sequenceCellIds: ['a', 'b', 'c'],
+      patternType: 'math-sister-output',
+      hideNodeRings: true,
+      isAuto: true
+    }
+  ]);
+
+  assert.equal(rings.size, 0);
+});
+
+test('L-pattern outlines exclude the unused fourth corner on either output side', () => {
+  const leftSource = { left: 0, top: 0, right: 10, bottom: 10 };
+  const rightSource = { left: 20, top: 0, right: 30, bottom: 10 };
+  const leftOutput = { left: 0, top: 20, right: 10, bottom: 30 };
+  const rightOutput = { left: 20, top: 20, right: 30, bottom: 30 };
+
+  assert.deepEqual(lPatternOutlinePoints([leftSource, rightSource, leftOutput], 'left', 2), [
+    { x: -2, y: -2 }, { x: 32, y: -2 }, { x: 32, y: 12 },
+    { x: 12, y: 12 }, { x: 12, y: 32 }, { x: -2, y: 32 }
+  ]);
+  assert.deepEqual(lPatternOutlinePoints([leftSource, rightSource, rightOutput], 'right', 2), [
+    { x: -2, y: -2 }, { x: 32, y: -2 }, { x: 32, y: 32 },
+    { x: 18, y: 32 }, { x: 18, y: 12 }, { x: -2, y: 12 }
+  ]);
+});
+
+test('L-pattern polygon paths round both outside and concave corners', () => {
+  const path = roundedPolygonPath([
+    { x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 10 },
+    { x: 10, y: 10 }, { x: 10, y: 30 }, { x: 0, y: 30 }
+  ], 3);
+
+  assert.match(path, /^M /);
+  assert.equal((path.match(/ Q /g) || []).length, 6);
+  assert.match(path, /Q 10 10/);
+  assert.match(path, / Z$/);
 });

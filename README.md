@@ -9,12 +9,14 @@ The toolbar includes persistent low-glare Light and Dark themes. **Update Draws*
 ## Workflow
 
 1. Review the latest ten drawings and optional relationship overlays in **Draw History**.
-2. Review the **Next Draw Board**, where each Ball column ranks the ones digits that historically followed its latest digit across up to 50 draws (#1 blue, #2 red, #3 green, honorable mention yellow), then toggle one digit per position for your own selection. Each mapped digit highlights all of its occurrences in Draw History; mapping the same digit twice adds concentric Ball-color rings.
+2. Review the **Next Draw Board**, where each Ball column shows three ones-digit recommendations scored from all seven pattern families across up to 50 draws. Open **Show all digits** for the original historical-successor view, then toggle one digit per position for your own selection. Each mapped digit highlights all of its occurrences in Draw History; mapping the same digit twice adds concentric Ball-color rings.
 3. Use **Study Similar Sequences** or **Inspect Number Evidence** across the latest 50 loaded drawings for context, then place useful full numbers directly into their corresponding slip positions.
 4. Build and save one or more five-number rows from the position-aware menus; mapped digits automatically filter each Ball, while unavailable tens bands and full numbers are removed when they cannot complete an increasing row within 1–42.
 5. Finalize the saved rows for the next drawing, then copy them in an iMessage-ready format or open the native macOS share sheet. Locked sessions remain visible and can return to Ticket Builder for editing.
 
-Pattern overlays support adjacent matches, same-column runs, one-column sister shifts, and three-draw mathematical sequences. Manual line and arrow annotations are available from the contextual **Annotate** toolbar.
+Pattern overlays support adjacent matches, same-column runs, one-column sister shifts, and mathematical sequences running vertically, diagonally, into an uncluttered three-draw sister-output path, or in an L shape. Manual line and arrow annotations are available from the contextual **Annotate** toolbar.
+
+Each per-Ball recommendation includes a relative pattern score and leakage-free walk-forward hit rate in the inspector. These are measurements of historical pattern performance, not probabilities for a random future drawing.
 
 ## Development
 

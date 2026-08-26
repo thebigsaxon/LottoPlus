@@ -11,6 +11,14 @@ test('Cash 5 Studio shell exposes contextual pattern, annotation, and session su
   const html = await readFile(htmlPath, 'utf8');
   assert.match(html, /<h1>Cash 5 Studio<\/h1>/);
   assert.match(html, /id="patternsPopover" hidden/);
+  assert.match(html, /id="chkDiagonalMathematicalSequences"/);
+  assert.match(html, /Left\/right sister shifts/);
+  assert.match(html, /id="chkSisterOutputSequences"/);
+  assert.match(html, /id="chkLPatterns"/);
+  assert.match(html, /id="futureDigitGrid"/);
+  assert.match(html, /id="futureAllDigitGrid"/);
+  assert.match(html, /id="allDigitsDisclosure"/);
+  assert.match(html, />Show all digits</);
   assert.match(html, /id="annotationToolbar" hidden/);
   assert.match(html, />Save row</);
   assert.match(html, /id="finalizeSharePrompt" hidden/);
@@ -45,6 +53,12 @@ test('position highlighting, click-off Patterns, and native sharing are wired', 
   assert.match(appSource, /findBoardSimilarSequences\(this\.researchDraws/);
   assert.match(appSource, /buildNumberEvidence\(focusedMapping\.digit, this\.researchDraws/);
   assert.match(appSource, /rankHistoricalSuccessors\(this\.researchDraws\)/);
+  assert.match(appSource, /showDiagonalMathematicalSequences = e\.target\.checked/);
+  assert.match(appSource, /showSisterOutputSequences = e\.target\.checked/);
+  assert.match(appSource, /showLPatterns = e\.target\.checked/);
+  assert.match(appSource, /rankPatternRecommendationsByColumn\(this\.researchDraws, 3\)/);
+  assert.match(appSource, /walk-forward hit rate/);
+  assert.match(appSource, /pattern-support-list/);
   assert.match(appSource, /successor-rank-/);
   assert.match(gridSource, /setPositionHighlights/);
   assert.match(gridSource, /position-highlighted/);
