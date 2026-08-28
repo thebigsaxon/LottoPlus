@@ -1,6 +1,7 @@
 /** Cash 5 ones-digit matrix renderer. */
 
 import { escapeHTML } from './validation.js';
+import { buildDigitHeatTimeline } from './repeatSummary.js?v=4';
 
 export class GridMatrix {
   constructor(tableContainerElement) {
@@ -17,7 +18,8 @@ export class GridMatrix {
       rowRoles: {},
       selectableContextRows: false,
       showWinningRowSelectors: false,
-      winningPatternDrawIds: []
+      winningPatternDrawIds: [],
+      heatHistoryDraws: []
     };
   }
 
@@ -58,10 +60,12 @@ export class GridMatrix {
     } = this.options;
     const selectedIds = new Set(selectedCellIds);
     const winningDrawIds = new Set((winningPatternDrawIds || []).map(String));
+    const heatHistory = this.options.heatHistoryDraws?.length ? this.options.heatHistoryDraws : this.draws;
+    const heatByDrawId = new Map(buildDigitHeatTimeline(heatHistory).map(item => [String(item.draw.id), item]));
     const columnSpan = showTens && showOnes ? 2 : 1;
     const header = `<thead><tr><th>Draw date</th>${Array.from({ length: 5 }, (_, index) => (
       `<th colspan="${columnSpan}">Ball ${index + 1}</th>${index < 4 ? '<th class="ball-sep"></th>' : ''}`
-    )).join('')}</tr></thead>`;
+    )).join('')}<th class="hcn-column-heading">HNCDE status</th></tr></thead>`;
 
     const body = this.draws.map(draw => {
       const safeId = escapeHTML(draw.id);
@@ -75,6 +79,15 @@ export class GridMatrix {
               aria-label="Show winning patterns ending on ${safeDate}" ${winningDrawIds.has(String(draw.id)) ? 'checked' : ''}>
           </label>`
         : '';
+      const heat = heatByDrawId.get(String(draw.id));
+      const emerging = new Set(heat?.emergingDigits || []);
+      const heatDigits = (tier, label, showCount = false) => `<span class="row-hcn-group row-hcn-${tier}"><b>${label}${showCount ? `<sup>${heat?.[tier]?.length || 0}</sup>` : ''}</b>${(heat?.[tier] || []).map(item => (
+        `<i class="row-hcn-digit${emerging.has(item.digit) ? ' is-emerging' : ''}" title="${emerging.has(item.digit) ? `${item.digit} moved from Cold to Drawn` : `${item.digit}: ${tier}`}">${item.digit}</i>`
+      )).join('') || '<em>—</em>'}</span>`;
+      const heatCell = `<td class="row-hcn-cell"><div class="row-hcn-box">
+        <div class="row-hcn-digits">${heatDigits('hot', 'H')}${heatDigits('neutral', 'N')}${heatDigits('cold', 'C')}</div>
+        <div class="row-hcn-movements">${heatDigits('declining', 'D', true)}${heatDigits('emerging', 'E', true)}</div>
+      </div></td>`;
       const cells = draw.numbers.map((number, column) => {
         const formatted = number.toString().padStart(2, '0');
         const tensDigit = formatted[0];
@@ -91,7 +104,7 @@ export class GridMatrix {
           : '';
         return `${tens}${ones}${column < 4 ? '<td class="ball-sep"></td>' : ''}`;
       }).join('');
-      return `<tr class="${roleClass}"><td class="date-cell"><div class="date-cell-inner">${winningSelector}<span class="date-cell-text">${displayRole ? `<span class="row-role-badge">${displayRole}</span>` : ''}${safeDate}</span></div></td>${cells}</tr>`;
+      return `<tr class="${roleClass}"><td class="date-cell"><div class="date-cell-inner">${winningSelector}<span class="date-cell-text">${displayRole ? `<span class="row-role-badge">${displayRole}</span>` : ''}${safeDate}</span></div></td>${cells}${heatCell}</tr>`;
     }).join('');
 
     this.container.innerHTML = `<table class="grid-table" id="matrixTable">${header}<tbody>${body}</tbody></table>`;

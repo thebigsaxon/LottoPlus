@@ -4,9 +4,9 @@ import { SAMPLE_CASH_5 } from './sampleData.js?v=3';
 import { parseCSV, autoMapColumns, convertRowsToDraws } from './csvParser.js';
 import { generateAutomatedPatterns } from './patternEngine.js?v=6';
 import { ConnectionEngine, normalizeManualConnectionChains } from './connectionEngine.js?v=10';
-import { GridMatrix } from './gridMatrix.js?v=7';
+import { GridMatrix } from './gridMatrix.js?v=10';
 import { fetchLiveCash5Update } from './liveFetcher.js?v=4';
-import { validateProject, validateDraw, escapeHTML } from './validation.js?v=4';
+import { validateProject, validateDraw, escapeHTML } from './validation.js?v=6';
 import { cash5AnalysisWindow, cash5ResearchWindow } from './drawFilters.js?v=2';
 import { findBoardSimilarSequences } from './motifEngine.js?v=4';
 import { buildNumberEvidence } from './evidenceEngine.js';
@@ -20,11 +20,12 @@ import {
   initializePredictionLedger,
   PATTERN_LABELS,
   reconcileOfficialDraws,
+  refreshPredictionSessionScores,
   summarizePredictionHistory
-} from './sessionStore.js?v=6';
+} from './sessionStore.js?v=11';
 import { futureCellEvidence, rankHistoricalSuccessors, selectFutureDigit } from './futureWorkspace.js?v=4';
-import { buildDigitRepeatSummary } from './repeatSummary.js';
-import { rankPatternRecommendationsByColumn } from './patternRecommendations.js?v=3';
+import { buildDigitRepeatSummary } from './repeatSummary.js?v=4';
+import { analyzeNextDrawBoard } from './patternRecommendations.js?v=7';
 import { hasAvailableOrderedSlip, recommendTensBands, TENS_BANDS, tensDigitForNumber } from './fuzzyTens.js?v=3';
 
 const INTERFACE_ZOOM_STEPS = [0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
@@ -72,6 +73,7 @@ export class Cash5StudioApp {
     this.jackpot = null;
     this.jackpotIsStale = true;
     this.winningPatternDrawIds = new Set();
+    this.nextDrawAnalysisCache = null;
 
     this.patternSettings = {
       showMatches: false,
@@ -145,6 +147,7 @@ export class Cash5StudioApp {
     this.motifSelectionSummary = document.getElementById("motifSelectionSummary");
     this.futureMapCard = document.getElementById("futureMapCard");
     this.futureDigitGrid = document.getElementById("futureDigitGrid");
+    this.futureSystemLines = document.getElementById("futureSystemLines");
     this.futureAllDigitGrid = document.getElementById("futureAllDigitGrid");
     this.futureMapInspector = document.getElementById("futureMapInspector");
     this.btnClearFutureMap = document.getElementById("btnClearFutureMap");
@@ -600,11 +603,13 @@ export class Cash5StudioApp {
   applyFilters(options = {}) {
     this.filteredDraws = cash5AnalysisWindow(this.draws);
     this.researchDraws = cash5ResearchWindow(this.draws);
+    this.nextDrawAnalysisCache = analyzeNextDrawBoard(this.researchDraws, { limit: 3 });
     this.workspace.motifSelections = [];
     this.workspace.motifMatches = [];
     if (options.initializeLedger) {
       this.workspace = initializePredictionLedger(this.workspace, this.draws).workspace;
     }
+    this.workspace.sessions = refreshPredictionSessionScores(this.workspace.sessions);
     this.refreshAutomaticTens();
     this.updateState();
   }
@@ -640,7 +645,8 @@ export class Cash5StudioApp {
         rowRoles,
         selectableContextRows: false,
         showWinningRowSelectors: this.patternSettings.showWinningPatterns,
-        winningPatternDrawIds: [...this.winningPatternDrawIds]
+        winningPatternDrawIds: [...this.winningPatternDrawIds],
+        heatHistoryDraws: this.researchDraws
       });
       this.gridMatrix.setPositionHighlights(this.workspace.futureDigitMap);
     }
@@ -657,15 +663,17 @@ export class Cash5StudioApp {
     if (!this.digitRepeatSummary) return;
     const summary = buildDigitRepeatSummary(this.filteredDraws);
     const displayItem = item => item
-      ? `<span class="repeat-summary-digit">${item.digit}${item.streak > 1 ? `<sup>${item.streak}</sup>` : ''}</span>`
+      ? `<span class="repeat-summary-digit" title="Digit ${item.digit}: ${item.count} draw${item.count === 1 ? '' : 's'} in the latest three">${item.digit}<sup>${item.count}</sup></span>`
       : '<span class="repeat-summary-empty">—</span>';
     const groups = [
-      ["Latest repeats", summary.latestRepeats],
-      ["Previous repeats", summary.previousRepeats],
-      ["Cold digits", summary.coldDigits]
+      ["Hot", summary.hot, "2+ sequential"],
+      ["Neutral", summary.neutral, "Recent, not sequential"],
+      ["Cold", summary.cold, "0 in latest 3"],
+      ["Declining", summary.declining, "Was hot; absent in N"],
+      ["Emerging", summary.emerging, "Was cold; drawn in N"]
     ];
-    this.digitRepeatSummary.innerHTML = groups.map(([label, items]) => `
-      <div class="summary-group"><strong>${label}</strong><span class="summary-digits">${items.length ? items.map(displayItem).join("") : displayItem(null)}</span></div>
+    this.digitRepeatSummary.innerHTML = groups.map(([label, items, detail]) => `
+      <div class="summary-group summary-${label.toLowerCase()}"><span class="summary-label"><strong>${label}</strong><small>${detail}</small></span><span class="summary-digits">${items.length ? items.map(displayItem).join("") : displayItem(null)}</span></div>
     `).join("");
   }
 
@@ -810,40 +818,79 @@ export class Cash5StudioApp {
     const successorCandidates = new Map(successorRankings.flatMap(result => (
       result.candidates.map(candidate => [`${result.column}:${candidate.digit}`, { ...candidate, result }])
     )));
-    const patternRankings = rankPatternRecommendationsByColumn(this.researchDraws, 3);
+    const boardAnalysis = this.nextDrawAnalysisCache
+      || analyzeNextDrawBoard(this.researchDraws, { limit: 3 });
+    const patternRankings = boardAnalysis.columns;
     const patternCandidates = new Map(patternRankings.flatMap(result => (
-      result.candidates.map(candidate => [`${result.column}:${candidate.digit}`, candidate])
+      (result.allCandidates || result.candidates).map(candidate => [`${result.column}:${candidate.digit}`, candidate])
     )));
     this.gridMatrix?.setPositionHighlights(selections);
 
     if (this.futureDigitGrid) {
       this.futureDigitGrid.classList.add('pattern-recommendation-grid');
       this.futureDigitGrid.innerHTML = `
-        <div class="future-grid-corner">Rank</div>
+        <div class="future-grid-corner">Line</div>
         ${Array.from({ length: 5 }, (_, column) => `<div class="future-space-head">Ball ${column + 1}</div>`).join('')}
         ${Array.from({ length: 3 }, (_, index) => {
           const rank = index + 1;
+          const line = boardAnalysis.lines.find(item => item.rank === rank);
           return `
           <div class="pattern-rank-label">#${rank}</div>
           ${Array.from({ length: 5 }, (_, column) => {
             const result = patternRankings.find(item => item.column === column);
-            const candidate = result?.candidates.find(item => item.rank === rank);
-            if (!candidate) return '<div class="pattern-recommendation-missing">—</div>';
-            const digit = candidate.digit;
+            const position = line?.positions?.[column];
+            const candidate = position
+              ? patternCandidates.get(`${column}:${position.digit}`)
+              : null;
+            if (!line?.available || !position || !candidate) {
+              const unavailable = line?.unavailableReason || result?.unavailableReason || `System Line ${rank} is unavailable.`;
+              return `<div class="pattern-recommendation-missing" title="${escapeHTML(unavailable)}">—</div>`;
+            }
+            const digit = position.digit;
             const key = `${column}:${digit}`;
             const mapped = mappedKeys.has(key);
             const active = this.workspace.activeFutureCell?.column === column && this.workspace.activeFutureCell?.digit === digit;
-            const backtestText = candidate.walkForwardSufficient
+            const backtestText = Number.isFinite(candidate.walkForwardTrials) && candidate.walkForwardSufficient
               ? `${Math.round(candidate.walkForwardRate * 100)}% walk-forward hit rate (${candidate.walkForwardHits} of ${candidate.walkForwardTrials})`
-              : `insufficient backtest sample (${candidate.walkForwardTrials} of 25 required trials)`;
-            const detail = `Rank ${rank} pattern recommendation for Ball ${column + 1}: ending ${digit}. Pattern score ${candidate.score} of 100; ${backtestText}.`;
+              : 'line-shape constraint applied';
+            const detail = `System Line ${rank}, Ball ${column + 1}: ending ${digit}, number ${position.number}. Ending score ${Math.round(position.endingScore)} of 100 (${Math.round(position.frequencyScore)} position frequency, ${Math.round(position.patternScore)} pattern, ${Math.round(position.stateScore)} HNCDE state); ${backtestText}.`;
             return `<button class="pattern-recommendation-cell rank-${rank} ${mapped ? `mapped position-${column + 1}` : ''} ${active ? 'active' : ''}"
               data-future-column="${column}" data-future-digit="${digit}" aria-pressed="${mapped}"
               title="${escapeHTML(detail)}" aria-label="${escapeHTML(`Select ${detail}`)}">
-              <b>${digit}</b>
+              <b>${digit}</b><small>→ ${String(position.number).padStart(2, '0')}</small>
             </button>`;
           }).join('')}`;
         }).join('')}`;
+    }
+
+    if (this.futureSystemLines) {
+      this.futureSystemLines.innerHTML = boardAnalysis.lines.map(line => {
+        if (!line.available) {
+          return `<div class="system-line unavailable"><div><strong>Line ${line.rank}</strong><span>${escapeHTML(line.unavailableReason)}</span></div></div>`;
+        }
+        return `<div class="system-line">
+          <div class="system-line-meta"><strong>Line ${line.rank}</strong><span>${line.score}/100 strategy · ${line.endingScore} ending · ${line.numberScore} number</span></div>
+          <div class="system-line-numbers">${line.numbers.map(number => `<span>${cash5NumberMarkup(number)}</span>`).join('')}</div>
+          <button class="mini-btn" type="button" data-use-system-line="${line.rank}">Use line</button>
+        </div>`;
+      }).join('');
+      this.futureSystemLines.querySelectorAll('[data-use-system-line]').forEach(button => {
+        button.addEventListener('click', () => {
+          const line = boardAnalysis.lines.find(item => item.rank === Number(button.dataset.useSystemLine));
+          if (!line?.available) return;
+          this.workspace.futureDigitMap = line.digits.map((digit, column) => ({ column, digit }));
+          this.workspace.activeFutureCell = { column: 0, digit: line.digits[0] };
+          this.workspace.slipNumbers = [...line.numbers];
+          this.workspace.slipTensFilters = line.numbers.map(tensDigitForNumber);
+          this.workspace.slipTensSources = Array(5).fill('automatic');
+          this.workspace.rowBuilder = [...line.numbers];
+          this.workspace.motifMatches = [];
+          this.gridMatrix?.setPositionHighlights(this.workspace.futureDigitMap);
+          this.renderCash5Workspace();
+          this.saveToLocalStorage();
+          this.showToast(`System Line ${line.rank} is now in the Ticket Builder.`);
+        });
+      });
     }
 
     if (this.futureAllDigitGrid) {
@@ -905,21 +952,36 @@ export class Cash5StudioApp {
           : `<span><b>—</b> successor rank<br><small>${successorResult?.totalTransitions || 0} matching transitions</small></span>`;
         const recommendationDetail = recommendation
           ? `<span class="pattern-inspector-summary">
-              <b>#${recommendation.rank} · ${recommendation.score}/100 pattern score</b><br>
+              <b>#${recommendation.rank} · ${Math.round(recommendation.endingScore)}/100 ending score</b><br>
+              <small>${Math.round(recommendation.frequencyScore)} position frequency · ${Math.round(recommendation.patternScore)} pattern · ${Math.round(recommendation.stateScore)} HNCDE (${recommendation.stateLabels.map(label => label[0].toUpperCase()).join('/')})</small><br>
               <small class="${recommendation.walkForwardSufficient ? 'pattern-backtest-sufficient' : 'pattern-backtest-limited'}">
                 ${recommendation.walkForwardSufficient
-                  ? `${Math.round(recommendation.walkForwardRate * 100)}% walk-forward hit rate · ${recommendation.walkForwardHits} of ${recommendation.walkForwardTrials} exact Ball outcomes`
+                  ? `${Math.round(recommendation.walkForwardRate * 100)}% ending match · ${Math.round(recommendation.walkForwardNumberRate * 100)}% exact-number match · ${recommendation.walkForwardTrials} trials`
                   : `Insufficient backtest sample · ${recommendation.walkForwardTrials} of 25 required Ball-position trials`}
               </small>
             </span>`
           : '';
         const patternEvidence = recommendation
           ? `<details open class="future-evidence-expander pattern-evidence-expander">
-              <summary>${recommendation.familyCount} supporting pattern ${recommendation.familyCount === 1 ? 'family' : 'families'} · ${recommendation.signalCount} signals</summary>
-              <ul class="pattern-support-list">${recommendation.families.map(family => `
-                <li><b>${escapeHTML(family.label)}</b><span>${Math.round(family.reliability * 100)}% smoothed signal precision</span>
-                  <small>${family.trials ? `${family.hits} of ${family.trials} historical signals hit` : 'No prior trials; Laplace-smoothed starting estimate'}${family.examples.length ? ` · ${family.examples.map(escapeHTML).join(' · ')}` : ''}</small>
-                </li>`).join('')}</ul>
+              <summary>${recommendation.familyCount} positive-lift pattern ${recommendation.familyCount === 1 ? 'family' : 'families'} · ${recommendation.signalCount} calibrated signals</summary>
+              ${recommendation.families.length ? `<ul class="pattern-support-list">${recommendation.families.map(family => `
+                <li><b>${escapeHTML(family.label)}</b><span>+${(family.lift * 100).toFixed(1)} points above this Ball/digit baseline</span>
+                  <small>${family.hits} of ${family.trials} historical signals hit · ${(family.posteriorRate * 100).toFixed(1)}% calibrated versus ${(family.baselineRate * 100).toFixed(1)}% baseline${family.examples.length ? ` · ${family.examples.map(escapeHTML).join(' · ')}` : ''}</small>
+                </li>`).join('')}</ul>` : '<p>No current pattern performed above this digit’s Ball-specific baseline; position frequency and HNCDE state supplied the ending support.</p>'}
+            </details>`
+          : '';
+        const streamEvidence = recommendation
+          ? `<details open class="future-evidence-expander stream-evidence-expander">
+              <summary>Full-number history · suggested ${String(recommendation.suggestedNumber).padStart(2, '0')}</summary>
+              <div class="stream-evidence-grid">
+                <span><small>Latest plus prior 3</small><b>${recommendation.recentValues.join(' → ')}</b></span>
+                <span><small>Signed changes</small><b>${recommendation.deltas.map(value => value > 0 ? `+${value}` : value).join(', ')}</b></span>
+                <span><small>Average change</small><b>${recommendation.averageDelta > 0 ? '+' : ''}${recommendation.averageDelta.toFixed(2)}</b></span>
+                <span><small>Clamped forecast</small><b>${recommendation.forecast.toFixed(2)}</b></span>
+                <span><small>Distance</small><b>${recommendation.streamDistance.toFixed(2)}</b></span>
+                <span><small>Position appearances</small><b>${recommendation.numberAppearances} in ${recommendation.unusedWindow} draws</b></span>
+              </div>
+              <button type="button" class="btn btn-secondary use-stream-number" data-map-full-number="${recommendation.suggestedNumber}">Use ${String(recommendation.suggestedNumber).padStart(2, '0')} in Ball ${active.column + 1}</button>
             </details>`
           : '';
         this.futureMapInspector.innerHTML = `
@@ -934,6 +996,7 @@ export class Cash5StudioApp {
             ${successorDetail}
           </div>
           ${patternEvidence}
+          ${streamEvidence}
           <details open class="future-evidence-expander">
             <summary>Full numbers ending in ${active.digit}</summary>
             <div class="future-full-number-grid">${evidence.fullNumbers.map(item => `
@@ -1266,7 +1329,7 @@ export class Cash5StudioApp {
     const shareAvailable = typeof window.cash5StudioNativeShare === 'function';
     const userRowCount = session.rows.filter(row => row.source !== 'system').length;
     this.finalizeSharePrompt.innerHTML = `
-      <div><strong>${userRowCount} user line${userRowCount === 1 ? '' : 's'} saved with this prediction.</strong><span>The system ranks, pattern signals, and your choices are now dated together.</span></div>
+      <div><strong>${userRowCount} user line${userRowCount === 1 ? '' : 's'} saved with this prediction.</strong><span>The system lines, ending evidence, number-history snapshot, and your choices are now dated together.</span></div>
       <div class="inline-actions">
         <button class="btn btn-primary" type="button" data-copy-finalized>Copy slips</button>
         ${shareAvailable ? '<button class="btn btn-secondary" type="button" data-share-finalized>Share…</button>' : ''}
@@ -1293,35 +1356,43 @@ export class Cash5StudioApp {
     }
 
     const percent = value => value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`;
-    const numberStrip = numbers => `<div class="ticket-numbers">${numbers.map(number => `<span>${String(number).padStart(2, '0')}</span>`).join('')}</div>`;
+    const numberStrip = (numbers, matchedNumbers = []) => {
+      const matched = new Set(matchedNumbers);
+      return `<div class="ticket-numbers">${numbers.map(number => `<span class="${matched.has(number) ? 'drawn-number-match' : ''}" ${matched.has(number) ? 'title="This picked number appeared in the actual draw"' : ''}>${String(number).padStart(2, '0')}</span>`).join('')}</div>`;
+    };
     const summary = summarizePredictionHistory(sessions);
     const scoredCount = sessions.filter(session => session.kind === 'prediction' && session.result).length;
     const pendingCount = sessions.filter(session => session.kind === 'prediction' && !session.result).length;
+    const modelOverviewMarkup = summary.models.map(model => `
+      <section class="ledger-model-summary">
+        <div class="ledger-model-label"><strong>Analyzer v${model.version}</strong><small>${model.version >= 3 ? 'State-aware mixed model' : model.version === 2 ? 'Preserved hybrid model' : 'Preserved original model'}</small></div>
+        <div class="ledger-group-grid">${model.groups.map(group => `
+          <article class="ledger-group">
+            <strong>${escapeHTML(group.label)}</strong>
+            ${group.trials ? `
+            <span><b>${percent(group.exactRate)}</b> drawn-number match</span>
+              <small>${group.exactHits}/${group.trials} numbers drawn · ${percent(group.endingRate)} endings · ${percent(group.tensRate)} tens · ${percent(group.missRate)} misses</small>
+            ` : '<small>No scored lines yet</small>'}
+          </article>`).join('')}</div>
+        <details class="pattern-scoreboard" ${model.patterns.families.length ? '' : 'hidden'}>
+          <summary>Pattern shorthand scorecard · v${model.version}</summary>
+          <div class="pattern-score-grid">${model.patterns.families.map(item => `
+            <span title="${escapeHTML(item.label)}"><b>${escapeHTML(item.code)}</b><em>${item.hits}/${item.trials}</em><small>${percent(item.rate)} hit rate</small></span>
+          `).join('')}</div>
+          <h4>Arithmetic and movement variants</h4>
+          <div class="pattern-operation-grid">${model.patterns.operations.map(item => `
+            <span><b>${escapeHTML(item.code)}</b><em>${item.hits}/${item.trials}</em><small>${percent(item.rate)}</small></span>
+          `).join('')}</div>
+          <p>Math suffixes: + addition · +M modulo-10 addition · −A absolute subtraction · −B borrowed subtraction.</p>
+        </details>
+      </section>`).join('');
     const aggregateMarkup = `
       <section class="ledger-overview">
         <div class="ledger-overview-head">
           <div><span class="eyebrow">Historical pattern agreement</span><strong>${scoredCount} scored drawing${scoredCount === 1 ? '' : 's'} · ${pendingCount} pending</strong></div>
           <small>Match rates describe recorded outcomes, not next-draw probability.</small>
         </div>
-        <div class="ledger-group-grid">${summary.groups.map(group => `
-          <article class="ledger-group">
-            <strong>${escapeHTML(group.label)}</strong>
-            ${group.trials ? `
-              <span><b>${percent(group.exactRate)}</b> exact number match</span>
-              <small>${group.exactHits}/${group.trials} exact · ${percent(group.endingRate)} endings · ${percent(group.tensRate)} tens · ${percent(group.missRate)} misses</small>
-            ` : '<small>No scored lines yet</small>'}
-          </article>`).join('')}</div>
-        <details class="pattern-scoreboard" ${summary.patterns.families.length ? '' : 'hidden'}>
-          <summary>Pattern shorthand scorecard</summary>
-          <div class="pattern-score-grid">${summary.patterns.families.map(item => `
-            <span title="${escapeHTML(item.label)}"><b>${escapeHTML(item.code)}</b><em>${item.hits}/${item.trials}</em><small>${percent(item.rate)} hit rate</small></span>
-          `).join('')}</div>
-          <h4>Arithmetic and movement variants</h4>
-          <div class="pattern-operation-grid">${summary.patterns.operations.map(item => `
-            <span><b>${escapeHTML(item.code)}</b><em>${item.hits}/${item.trials}</em><small>${percent(item.rate)}</small></span>
-          `).join('')}</div>
-          <p>Math suffixes: + addition · +M modulo-10 addition · −A absolute subtraction · −B borrowed subtraction.</p>
-        </details>
+        ${modelOverviewMarkup}
       </section>`;
 
     const sessionMarkup = session => {
@@ -1330,7 +1401,10 @@ export class Cash5StudioApp {
       const userRows = session.rows.filter(row => row.source !== 'system' && row.available !== false);
       const rowMarkup = session.rows.map((row, index) => {
         const score = scoreByRow.get(row.id);
-        const title = row.source === 'system' ? `System Rank ${row.rank}` : `Your Line ${userRows.indexOf(row) + 1}`;
+        const analyzerVersion = Number(session.analyzerVersion || session.trackingVersion || 1);
+        const title = row.source === 'system'
+          ? `${analyzerVersion >= 2 ? 'System Line' : 'System Rank'} ${row.rank}`
+          : `Your Line ${userRows.indexOf(row) + 1}`;
         if (row.available === false) {
           return `<article class="ledger-row unavailable">
             <div class="ledger-row-head"><strong>${escapeHTML(title)}</strong><span>Unavailable</span></div>
@@ -1341,18 +1415,18 @@ export class Cash5StudioApp {
           (item.families || []).map(family => family.code)
         )))];
         const diagnostics = score?.positions?.length ? `<div class="position-diagnostics">${score.positions.map(item => {
-          const className = item.exact ? 'exact' : item.endingHit ? 'ending' : item.tensHit ? 'tens' : 'miss';
+          const className = item.numberHit ? 'exact' : item.endingHit ? 'ending' : item.tensHit ? 'tens' : 'miss';
           return `<span class="${className}" title="Ball ${item.column + 1}: selected ${item.selected}, actual ${item.actual} — ${escapeHTML(item.diagnostic)}"><b>B${item.column + 1}</b><em>${item.selected}→${item.actual}</em><small>${escapeHTML(item.diagnostic)}</small></span>`;
         }).join('')}</div>` : '';
         const scoredLabel = session.kind === 'prediction'
-          ? score?.available ? `${score.hits}/5 exact · ${percent(score.matchRate)} match / ${percent(score.missRate)} miss` : 'Pending'
+          ? score?.available ? `${score.hits}/5 numbers · ${percent(score.matchRate)} match / ${percent(score.missRate)} miss` : 'Pending'
           : score ? `${score.hits}/5 winning numbers matched` : 'Pending';
         return `<article class="ledger-row ${row.source === 'system' ? 'system' : 'user'}">
           <div class="ledger-row-head">
             <strong>${escapeHTML(title)}</strong>
             <span>${scoredLabel}</span>
           </div>
-          <div class="ledger-row-numbers">${numberStrip(row.numbers)}
+          <div class="ledger-row-numbers">${numberStrip(row.numbers, score?.matchedNumbers)}
             ${session.kind === 'prediction' && score?.available ? `<div class="ledger-row-rates"><span>Endings <b>${score.endingHits}/5</b></span><span>Tens <b>${score.tensHits}/5</b></span></div>` : ''}
           </div>
           ${row.source === 'system' && familyCodes.length ? `<div class="row-pattern-codes"><small>Supporting families</small>${familyCodes.map(code => `<b>${escapeHTML(code)}</b>`).join('')}</div>` : ''}
@@ -1391,7 +1465,7 @@ export class Cash5StudioApp {
       const canEdit = userRows.length > 0;
       return `<section class="session-card ${session.status} ${session.kind || 'legacy'}">
         <div class="session-head"><strong>${escapeHTML(session.baselineDate)} → ${session.result ? escapeHTML(session.result.date) : 'next official draw'}</strong><span>${session.status}</span></div>
-        <div class="session-meta">${session.kind === 'prediction' ? `${session.historyDrawCount || 0}-draw evidence window` : `Locked ${escapeHTML(lockedLabel)}`} · ${session.rows.length} recorded line${session.rows.length === 1 ? '' : 's'}</div>
+        <div class="session-meta">${session.kind === 'prediction' ? `Analyzer v${Number(session.analyzerVersion || session.trackingVersion || 1)} · ${session.historyDrawCount || 0}-draw evidence window` : `Locked ${escapeHTML(lockedLabel)}`} · ${session.rows.length} recorded line${session.rows.length === 1 ? '' : 's'}</div>
         ${resultMarkup}
         <div class="session-rows">${rowMarkup}</div>
         ${patternMarkup}

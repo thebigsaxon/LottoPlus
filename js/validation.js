@@ -194,6 +194,7 @@ function sanitizeRows(rows) {
       id: String(row.id || `imported-row-${index}`),
       source,
       rank: source === 'system' && [1, 2, 3].includes(Number(row.rank)) ? Number(row.rank) : null,
+      analyzerVersion: source === 'system' ? Math.max(1, Number(row.analyzerVersion) || 1) : null,
       available,
       unavailableReason: String(row.unavailableReason || '').slice(0, 500),
       numbers,
@@ -205,7 +206,10 @@ function sanitizeRows(rows) {
       createdFromDrawCount: Math.max(0, Number(row.createdFromDrawCount) || 0),
       selectionScore: row.selectionScore && typeof row.selectionScore === 'object' ? {
         tens: Number(row.selectionScore.tens) || 0,
-        historyFit: Number(row.selectionScore.historyFit) || 0
+        historyFit: Number(row.selectionScore.historyFit) || 0,
+        combined: Number(row.selectionScore.combined) || 0,
+        pattern: Number(row.selectionScore.pattern) || 0,
+        stream: Number(row.selectionScore.stream) || 0
       } : null,
       numberEvidence: Array.isArray(row.numberEvidence) ? row.numberEvidence.slice(0, 5).map(item => ({
         number: Number(item?.number) || 0,
@@ -221,8 +225,17 @@ function sanitizeRows(rows) {
       })) : [],
       candidateEvidence: Array.isArray(row.candidateEvidence) ? row.candidateEvidence.slice(0, 5).map(item => ({
         column: Math.max(0, Math.min(4, Number(item?.column) || 0)),
+        number: Math.max(0, Math.min(42, Number(item?.number) || 0)),
         digit: Math.max(0, Math.min(9, Number(item?.digit) || 0)),
         score: Math.max(0, Math.min(100, Number(item?.score) || 0)),
+        combinedScore: Math.max(0, Math.min(100, Number(item?.combinedScore) || 0)),
+        patternScore: Math.max(0, Math.min(100, Number(item?.patternScore) || 0)),
+        streamScore: Math.max(0, Math.min(100, Number(item?.streamScore) || 0)),
+        streamDistance: Math.max(0, Number(item?.streamDistance) || 0),
+        forecast: item?.forecast === null ? null : Number(item?.forecast) || 0,
+        recentValues: Array.isArray(item?.recentValues) ? item.recentValues.map(Number).filter(Number.isFinite).slice(-4) : [],
+        deltas: Array.isArray(item?.deltas) ? item.deltas.map(Number).filter(Number.isFinite).slice(-3) : [],
+        averageDelta: item?.averageDelta === null ? null : Number(item?.averageDelta) || 0,
         familyCount: Math.max(0, Number(item?.familyCount) || 0),
         signalCount: Math.max(0, Number(item?.signalCount) || 0),
         families: Array.isArray(item?.families) ? item.families.map(family => ({
@@ -230,6 +243,8 @@ function sanitizeRows(rows) {
           code: String(family?.code || '').slice(0, 12),
           label: String(family?.label || '').slice(0, 100),
           reliability: Math.max(0, Math.min(1, Number(family?.reliability) || 0)),
+          baselineRate: Math.max(0, Math.min(1, Number(family?.baselineRate) || 0)),
+          lift: Math.max(0, Math.min(1, Number(family?.lift) || 0)),
           hits: Math.max(0, Number(family?.hits) || 0),
           trials: Math.max(0, Number(family?.trials) || 0)
         })) : []
@@ -290,9 +305,14 @@ function sanitizePatternSignals(signals) {
         : [],
       sourceDrawIds: Array.isArray(signal.sourceDrawIds) ? signal.sourceDrawIds.map(String).slice(0, 4) : [],
       explanation: String(signal.explanation || '').slice(0, 500),
+      analyzerVersion: Math.max(1, Number(signal.analyzerVersion) || 1),
+      direction: Math.max(-4, Math.min(4, Number(signal.direction) || 0)),
       reliabilityHits: Math.max(0, Number(signal.reliabilityHits) || 0),
       reliabilityTrials: Math.max(0, Number(signal.reliabilityTrials) || 0),
-      reliability: Math.max(0, Math.min(1, Number(signal.reliability) || 0))
+      reliability: Math.max(0, Math.min(1, Number(signal.reliability) || 0)),
+      baselineRate: Math.max(0, Math.min(1, Number(signal.baselineRate) || 0)),
+      posteriorRate: Math.max(0, Math.min(1, Number(signal.posteriorRate) || 0)),
+      lift: Math.max(0, Math.min(1, Number(signal.lift) || 0))
     };
   }).filter(Boolean);
 }
@@ -305,6 +325,10 @@ function sanitizeRowScores(scores) {
       selected: Number(item?.selected) || 0,
       actual: Number(item?.actual) || 0,
       exact: Boolean(item?.exact),
+      numberHit: Boolean(item?.numberHit),
+      matchedColumn: item?.matchedColumn === null || item?.matchedColumn === undefined
+        ? null
+        : Math.max(0, Math.min(4, Number(item.matchedColumn) || 0)),
       endingHit: Boolean(item?.endingHit),
       tensHit: Boolean(item?.tensHit),
       diagnostic: String(item?.diagnostic || '').slice(0, 100)
@@ -319,6 +343,7 @@ function sanitizeRowScores(scores) {
       misses: Math.max(0, Math.min(5, Number(score?.misses) || 0)),
       matchRate: score?.matchRate === null ? null : Math.max(0, Math.min(1, Number(score?.matchRate) || 0)),
       missRate: score?.missRate === null ? null : Math.max(0, Math.min(1, Number(score?.missRate) || 0)),
+      exactPositionHits: Math.max(0, Math.min(5, Number(score?.exactPositionHits) || 0)),
       endingHits: Math.max(0, Math.min(5, Number(score?.endingHits) || 0)),
       endingRate: score?.endingRate === null ? null : Math.max(0, Math.min(1, Number(score?.endingRate) || 0)),
       tensHits: Math.max(0, Math.min(5, Number(score?.tensHits) || 0)),
@@ -365,6 +390,7 @@ function sanitizeSessions(sessions) {
       id: String(session.id || `imported-session-${index}`),
       kind,
       trackingVersion: kind === 'prediction' ? Math.max(1, Number(session.trackingVersion) || 1) : null,
+      analyzerVersion: kind === 'prediction' ? Math.max(1, Number(session.analyzerVersion || session.trackingVersion) || 1) : null,
       creationSource: String(session.creationSource || (kind === 'prediction' ? 'imported' : 'legacy')).slice(0, 40),
       status: result ? 'scored' : kind === 'prediction' ? 'pending' : 'locked',
       finalizedAt: String(session.finalizedAt || new Date(0).toISOString()),
@@ -378,6 +404,17 @@ function sanitizeSessions(sessions) {
       fullCandidates: sanitizeCash5Numbers(session.fullCandidates),
       rows,
       patternSignals: sanitizePatternSignals(session.patternSignals),
+      streamSnapshot: Array.isArray(session.streamSnapshot) ? session.streamSnapshot.slice(0, 5).map((item, column) => ({
+        column,
+        available: item?.available !== false,
+        unavailableReason: String(item?.unavailableReason || '').slice(0, 500),
+        recentValues: Array.isArray(item?.recentValues) ? item.recentValues.map(Number).filter(Number.isFinite).slice(-4) : [],
+        deltas: Array.isArray(item?.deltas) ? item.deltas.map(Number).filter(Number.isFinite).slice(-3) : [],
+        averageDelta: Number(item?.averageDelta) || 0,
+        rawForecast: Number(item?.rawForecast) || 0,
+        forecast: Number(item?.forecast) || 0,
+        unusedCount: Math.max(0, Number(item?.unusedCount) || 0)
+      })) : [],
       result
     };
   }).filter(Boolean);
@@ -444,6 +481,7 @@ function sanitizeWorkspace(workspace) {
     predictionTracker: workspace.predictionTracker && typeof workspace.predictionTracker === 'object' ? {
       version: Math.max(0, Number(workspace.predictionTracker.version) || 0),
       initializedAt: String(workspace.predictionTracker.initializedAt || ''),
+      upgradedAt: String(workspace.predictionTracker.upgradedAt || ''),
       latestOfficialDrawDate: String(workspace.predictionTracker.latestOfficialDrawDate || '')
     } : null
   };

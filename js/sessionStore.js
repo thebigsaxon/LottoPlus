@@ -1,17 +1,15 @@
-import { buildNumberEvidence } from './evidenceEngine.js';
-import { findBoardSimilarSequences } from './motifEngine.js?v=4';
 import { onesDigit } from './onesAnalysis.js';
 import {
-  rankPatternRecommendationsByColumn,
+  analyzeNextDrawBoard,
+  NEXT_DRAW_ANALYZER_VERSION,
   snapshotNextPatternSignals
-} from './patternRecommendations.js?v=3';
+} from './patternRecommendations.js?v=7';
 import {
-  hasAvailableOrderedSlip,
   recommendTensBands,
   tensDigitForNumber
 } from './fuzzyTens.js?v=3';
 
-export const PREDICTION_TRACKER_VERSION = 1;
+export const PREDICTION_TRACKER_VERSION = 4;
 export const PREDICTION_BACKFILL_COUNT = 10;
 
 export const PATTERN_SHORTHAND = {
@@ -54,13 +52,6 @@ function chronologicalDraws(draws = []) {
 
 function rate(hits, trials) {
   return trials ? hits / trials : null;
-}
-
-function compareNumberRows(left, right) {
-  for (let index = 0; index < 5; index += 1) {
-    if (left[index] !== right[index]) return left[index] - right[index];
-  }
-  return 0;
 }
 
 function operationSuffix(operation, explanation = '') {
@@ -141,126 +132,80 @@ export function finalizeSession(workspace, latestDraw, now = new Date()) {
   };
 }
 
-function buildSystemRow(history, rankings, rank) {
-  const rankedCandidates = Array.from({ length: 5 }, (_, column) => (
-    rankings.find(item => item.column === column)?.candidates.find(candidate => candidate.rank === rank) || null
-  ));
-  const missingColumns = rankedCandidates
-    .map((candidate, column) => candidate ? null : column + 1)
-    .filter(Boolean);
+function buildSystemRow(history, analysis, rank) {
+  const line = analysis.lines.find(item => item.rank === rank);
   const base = {
     id: `system-rank-${rank}`,
     source: 'system',
     rank,
+    analyzerVersion: NEXT_DRAW_ANALYZER_VERSION,
     label: 'strong',
     note: '',
     createdFromDrawCount: history.length,
-    candidateEvidence: rankedCandidates.map((candidate, column) => candidate ? ({
-      column,
-      digit: candidate.digit,
-      score: candidate.score,
-      familyCount: candidate.familyCount,
-      signalCount: candidate.signalCount,
-      families: candidate.families.map(family => ({
+    candidateEvidence: (line?.positions || []).map((position, column) => {
+      const columnResult = analysis.columns[column];
+      return {
+        column,
+        number: position.number,
+        digit: position.digit,
+        score: Math.round(position.combinedScore),
+        combinedScore: position.combinedScore,
+        endingScore: position.endingScore,
+        numberScore: position.numberScore,
+        frequencyScore: position.frequencyScore,
+        stateScore: position.stateScore,
+        stateLabels: [...(position.stateLabels || [])],
+        patternScore: position.patternScore,
+        streamScore: position.streamScore,
+        streamDistance: position.distance,
+        forecast: columnResult?.stream?.forecast ?? null,
+        recentValues: columnResult?.stream?.recentValues || [],
+        deltas: columnResult?.stream?.deltas || [],
+        averageDelta: columnResult?.stream?.averageDelta ?? null,
+        familyCount: position.familyCount,
+        families: (position.families || []).map(family => ({
         key: family.key,
         code: PATTERN_SHORTHAND[family.key] || family.key,
         label: family.label,
         reliability: family.reliability,
+        baselineRate: family.baselineRate,
+        lift: family.lift,
         hits: family.hits,
         trials: family.trials
       }))
-    }) : null).filter(Boolean)
+      };
+    })
   };
-  if (missingColumns.length) {
+  if (!line?.available) {
     return {
       ...base,
       available: false,
-      unavailableReason: `Rank ${rank} lacked pattern support for Ball ${missingColumns.join(', ')}.`,
+      unavailableReason: line?.unavailableReason || `System line ${rank} is unavailable.`,
       numbers: [],
-      digits: rankedCandidates.map(candidate => candidate?.digit ?? null),
+      digits: [],
       tensBands: [],
       tensFilters: [],
       tensSources: []
     };
   }
-
-  const digits = rankedCandidates.map(candidate => candidate.digit);
-  const mappedDigits = digits.map((digit, column) => ({ column, digit }));
-  const motifMatches = findBoardSimilarSequences(history, mappedDigits);
-  const tensRecommendations = recommendTensBands(history, {
-    mappedDigits: digits,
-    tensFilters: [null, null, null, null, null],
-    fixedNumbers: [null, null, null, null, null]
-  });
-  const evidenceByColumn = digits.map((digit, column) => (
-    buildNumberEvidence(digit, history, motifMatches, [column])
-  ));
-  let best = null;
-
-  const visit = (column, previous, numbers, tensScore, historyScore, evidence) => {
-    if (column === 5) {
-      const candidate = { numbers, tensScore, historyScore, evidence };
-      const isBetter = !best
-        || candidate.tensScore > best.tensScore
-        || candidate.tensScore === best.tensScore && candidate.historyScore > best.historyScore
-        || candidate.tensScore === best.tensScore && candidate.historyScore === best.historyScore
-          && compareNumberRows(candidate.numbers, best.numbers) < 0;
-      if (isBetter) best = candidate;
-      return;
-    }
-    evidenceByColumn[column].forEach(item => {
-      if (item.number <= previous) return;
-      const band = tensDigitForNumber(item.number);
-      const bandEvidence = tensRecommendations[column].ranked.find(entry => entry.digit === band);
-      if (!bandEvidence?.available) return;
-      visit(
-        column + 1,
-        item.number,
-        [...numbers, item.number],
-        tensScore + bandEvidence.score,
-        historyScore + item.rawHistoryFit,
-        [...evidence, {
-          number: item.number,
-          historyFit: item.historyFit,
-          rawHistoryFit: item.rawHistoryFit,
-          motifFutureCount: item.motifFutureCount,
-          sameColumnCount: item.sameColumnCount,
-          sisterColumnCount: item.sisterColumnCount,
-          frequency: item.frequency,
-          mostRecentRowsAgo: item.mostRecentRowsAgo,
-          tensScore: bandEvidence.score,
-          tensReason: bandEvidence.reason
-        }]
-      );
-    });
-  };
-  visit(0, 0, [], 0, 0, []);
-
-  if (!best || !hasAvailableOrderedSlip({ mappedDigits: digits, fixedNumbers: best.numbers })) {
-    return {
-      ...base,
-      available: false,
-      unavailableReason: `Rank ${rank} could not form a unique, increasing 1–42 line from its pattern endings.`,
-      numbers: [],
-      digits,
-      tensBands: [],
-      tensFilters: [],
-      tensSources: []
-    };
-  }
-
-  const tensBands = best.numbers.map(tensDigitForNumber);
+  const tensBands = line.numbers.map(tensDigitForNumber);
   return {
     ...base,
     available: true,
     unavailableReason: '',
-    numbers: best.numbers,
-    digits,
+    numbers: [...line.numbers],
+    digits: [...line.digits],
     tensBands,
     tensFilters: tensBands,
     tensSources: Array(5).fill('automatic'),
-    selectionScore: { tens: best.tensScore, historyFit: best.historyScore },
-    numberEvidence: best.evidence
+    selectionScore: {
+      combined: line.totalCombinedScore,
+      ending: line.totalEndingScore,
+      number: line.totalNumberScore,
+      pattern: line.totalPatternScore,
+      stream: line.totalStreamScore
+    },
+    numberEvidence: base.candidateEvidence
   };
 }
 
@@ -269,7 +214,7 @@ export function createPredictionSession(history, options = {}) {
   const window = chronological.slice(-50);
   const latestDraw = window.at(-1);
   if (!latestDraw) return null;
-  const rankings = rankPatternRecommendationsByColumn(window, 3);
+  const analysis = analyzeNextDrawBoard(window, { limit: 3, includeWalkForward: false });
   const rawSignals = snapshotNextPatternSignals(window);
   const patternSignals = rawSignals.map((signal, index) => ({
     id: `signal-${latestDraw.date}-${index}-${signal.pattern}-${signal.targetColumn}-${signal.digit}`,
@@ -282,6 +227,7 @@ export function createPredictionSession(history, options = {}) {
     id: `prediction-${latestDraw.id}`,
     kind: 'prediction',
     trackingVersion: PREDICTION_TRACKER_VERSION,
+    analyzerVersion: NEXT_DRAW_ANALYZER_VERSION,
     creationSource: options.creationSource || 'official',
     status: 'pending',
     finalizedAt: options.createdAt || `${latestDraw.date}T23:59:59.000Z`,
@@ -293,7 +239,13 @@ export function createPredictionSession(history, options = {}) {
     motifMatches: [],
     candidateDigits: [],
     fullCandidates: [],
-    rows: [1, 2, 3].map(rank => buildSystemRow(window, rankings, rank)),
+    rows: [1, 2, 3].map(rank => buildSystemRow(window, analysis, rank)),
+    streamSnapshot: analysis.columns.map(result => ({
+      column: result.column,
+      available: result.available,
+      unavailableReason: result.unavailableReason,
+      ...(result.stream || {})
+    })),
     patternSignals,
     result: null
   };
@@ -346,7 +298,9 @@ export function formatSessionForMessage(session) {
   const lines = rows.map((row, index) => {
     if (row.source !== 'system') userIndex += 1;
     const label = session.kind !== 'prediction' ? `Row ${index + 1}`
-      : row.source === 'system' ? `System Rank ${row.rank}` : `User Row ${userIndex}`;
+      : row.source === 'system'
+        ? `${Number(session.analyzerVersion || session.trackingVersion || 1) >= 2 ? 'System Line' : 'System Rank'} ${row.rank}`
+        : `User Row ${userIndex}`;
     return `${label}: ${row.numbers.map(number => String(number).padStart(2, '0')).join(' - ')}`;
   });
   return [heading, ...lines].join('\n');
@@ -380,18 +334,23 @@ function scoreRow(row, actualNumbers) {
   if (row.available === false || !Array.isArray(row.numbers) || row.numbers.length !== 5) {
     return { rowId: row.id, source: row.source, rank: row.rank || null, available: false, unavailableReason: row.unavailableReason || '' };
   }
+  const winningNumbers = new Set(actualNumbers);
   const positions = row.numbers.map((selected, column) => {
     const actual = actualNumbers[column];
     const exact = selected === actual;
+    const numberHit = winningNumbers.has(selected);
+    const matchedColumn = numberHit ? actualNumbers.indexOf(selected) : null;
     const endingHit = onesDigit(selected) === onesDigit(actual);
     const tensHit = tensDigitForNumber(selected) === tensDigitForNumber(actual);
-    const diagnostic = exact ? 'exact match'
+    const diagnostic = exact ? 'exact position match'
+      : numberHit ? `number drawn in Ball ${matchedColumn + 1}`
       : endingHit && !tensHit ? 'ending right / tens wrong'
         : tensHit && !endingHit ? 'tens right / ending wrong'
           : 'both wrong';
-    return { column, selected, actual, exact, endingHit, tensHit, diagnostic };
+    return { column, selected, actual, exact, numberHit, matchedColumn, endingHit, tensHit, diagnostic };
   });
-  const hits = positions.filter(item => item.exact).length;
+  const hits = positions.filter(item => item.numberHit).length;
+  const exactPositionHits = positions.filter(item => item.exact).length;
   const endingHits = positions.filter(item => item.endingHit).length;
   const tensHits = positions.filter(item => item.tensHit).length;
   return {
@@ -403,12 +362,13 @@ function scoreRow(row, actualNumbers) {
     misses: 5 - hits,
     matchRate: rate(hits, 5),
     missRate: rate(5 - hits, 5),
+    exactPositionHits,
     endingHits,
     endingRate: rate(endingHits, 5),
     tensHits,
     tensRate: rate(tensHits, 5),
-    matchedNumbers: positions.filter(item => item.exact).map(item => item.selected),
-    missedNumbers: positions.filter(item => !item.exact).map(item => item.selected),
+    matchedNumbers: positions.filter(item => item.numberHit).map(item => item.selected),
+    missedNumbers: positions.filter(item => !item.numberHit).map(item => item.selected),
     positions
   };
 }
@@ -480,6 +440,21 @@ export function scorePredictionSession(session, actualDraw) {
   };
 }
 
+/** Recalculate persisted prediction results after scoring rules evolve. */
+export function refreshPredictionSessionScores(sessions = []) {
+  return (sessions || []).map(session => {
+    if (session?.kind !== 'prediction' || !session.result?.numbers?.length) return session;
+    return scorePredictionSession(
+      { ...session, status: 'pending', result: null },
+      {
+        id: session.result.drawId,
+        date: session.result.date,
+        numbers: session.result.numbers
+      }
+    );
+  });
+}
+
 export function scoreSession(session, draws) {
   if (!session || session.result) return session;
   const nextDraw = chronologicalDraws(draws).find(draw => draw.date > session.baselineDate);
@@ -512,11 +487,50 @@ function predictionSessionForBaseline(sessions, baselineDate) {
   return sessions.find(session => session.kind === 'prediction' && session.baselineDate === baselineDate);
 }
 
+function migratePendingPredictionSessions(workspace, chronological, now) {
+  const sessions = (workspace.sessions || []).map(session => {
+    if (session.kind !== 'prediction' || session.result
+        || Number(session.analyzerVersion || session.trackingVersion || 1) >= NEXT_DRAW_ANALYZER_VERSION) {
+      return session;
+    }
+    const history = chronological.filter(draw => draw.date <= session.baselineDate);
+    const rebuilt = createPredictionSession(history, {
+      creationSource: `model-v${NEXT_DRAW_ANALYZER_VERSION}-migration`,
+      createdAt: session.finalizedAt || now.toISOString()
+    });
+    if (!rebuilt) return session;
+    const userRows = (session.rows || []).filter(row => row.source !== 'system');
+    return {
+      ...rebuilt,
+      id: session.id,
+      finalizedAt: session.finalizedAt || rebuilt.finalizedAt,
+      rows: [...rebuilt.rows, ...structuredCloneSafe(userRows)],
+      migratedFromAnalyzerVersion: Number(session.analyzerVersion || session.trackingVersion || 1)
+    };
+  });
+  return {
+    ...workspace,
+    sessions,
+    predictionTracker: {
+      version: PREDICTION_TRACKER_VERSION,
+      initializedAt: workspace.predictionTracker?.initializedAt || now.toISOString(),
+      upgradedAt: now.toISOString(),
+      latestOfficialDrawDate: chronological.at(-1)?.date || workspace.predictionTracker?.latestOfficialDrawDate || ''
+    }
+  };
+}
+
 export function initializePredictionLedger(workspace, draws, now = new Date()) {
   const tracker = workspace?.predictionTracker;
   if (tracker?.version === PREDICTION_TRACKER_VERSION) return { workspace, initialized: false };
   const chronological = chronologicalDraws(draws);
   if (chronological.length < 2) return { workspace, initialized: false };
+  if (Number(tracker?.version) > 0 && Number(tracker.version) < PREDICTION_TRACKER_VERSION) {
+    return {
+      initialized: true,
+      workspace: migratePendingPredictionSessions(workspace, chronological, now)
+    };
+  }
   const existing = [...(workspace.sessions || [])];
   const firstTargetIndex = Math.max(1, chronological.length - PREDICTION_BACKFILL_COUNT);
   const generated = [];
@@ -625,18 +639,20 @@ export function autoSelectTensFilters(workspace, draws) {
 }
 
 export function summarizePredictionHistory(sessions = []) {
-  const groups = new Map([
-    ['system-1', { key: 'system-1', label: 'System Rank 1', exactHits: 0, endingHits: 0, tensHits: 0, trials: 0, lines: 0 }],
-    ['system-2', { key: 'system-2', label: 'System Rank 2', exactHits: 0, endingHits: 0, tensHits: 0, trials: 0, lines: 0 }],
-    ['system-3', { key: 'system-3', label: 'System Rank 3', exactHits: 0, endingHits: 0, tensHits: 0, trials: 0, lines: 0 }],
+  const modelGroups = new Map();
+  const groupTemplate = version => new Map([
+    ['system-1', { key: 'system-1', label: version >= 2 ? 'System Line 1' : 'System Rank 1', exactHits: 0, endingHits: 0, tensHits: 0, trials: 0, lines: 0 }],
+    ['system-2', { key: 'system-2', label: version >= 2 ? 'System Line 2' : 'System Rank 2', exactHits: 0, endingHits: 0, tensHits: 0, trials: 0, lines: 0 }],
+    ['system-3', { key: 'system-3', label: version >= 2 ? 'System Line 3' : 'System Rank 3', exactHits: 0, endingHits: 0, tensHits: 0, trials: 0, lines: 0 }],
     ['user', { key: 'user', label: 'Your saved lines', exactHits: 0, endingHits: 0, tensHits: 0, trials: 0, lines: 0 }]
   ]);
-  const patternScores = [];
   (sessions || []).filter(session => session.kind === 'prediction' && session.result).forEach(session => {
+    const version = Number(session.analyzerVersion || session.trackingVersion || 1);
+    const model = modelGroups.get(version) || { version, groups: groupTemplate(version), patternScores: [] };
     session.result.rowScores.forEach(score => {
       if (!score.available) return;
       const key = score.source === 'system' ? `system-${score.rank}` : 'user';
-      const group = groups.get(key);
+      const group = model.groups.get(key);
       if (!group) return;
       group.lines += 1;
       group.trials += 5;
@@ -644,16 +660,27 @@ export function summarizePredictionHistory(sessions = []) {
       group.endingHits += score.endingHits || 0;
       group.tensHits += score.tensHits || 0;
     });
-    patternScores.push(...(session.result.patternSignalScores || []));
+    model.patternScores.push(...(session.result.patternSignalScores || []));
+    modelGroups.set(version, model);
   });
+  const finishGroups = groups => [...groups.values()].map(group => ({
+    ...group,
+    exactRate: rate(group.exactHits, group.trials),
+    missRate: rate(group.trials - group.exactHits, group.trials),
+    endingRate: rate(group.endingHits, group.trials),
+    tensRate: rate(group.tensHits, group.trials)
+  }));
+  const models = [...modelGroups.values()]
+    .sort((a, b) => b.version - a.version)
+    .map(model => ({
+      version: model.version,
+      groups: finishGroups(model.groups),
+      patterns: aggregatePatternScores(model.patternScores)
+    }));
+  const primary = models[0] || { version: NEXT_DRAW_ANALYZER_VERSION, groups: finishGroups(groupTemplate(NEXT_DRAW_ANALYZER_VERSION)), patterns: aggregatePatternScores([]) };
   return {
-    groups: [...groups.values()].map(group => ({
-      ...group,
-      exactRate: rate(group.exactHits, group.trials),
-      missRate: rate(group.trials - group.exactHits, group.trials),
-      endingRate: rate(group.endingHits, group.trials),
-      tensRate: rate(group.tensHits, group.trials)
-    })),
-    patterns: aggregatePatternScores(patternScores)
+    models,
+    groups: primary.groups,
+    patterns: primary.patterns
   };
 }

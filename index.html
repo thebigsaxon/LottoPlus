@@ -15,7 +15,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=17">
+  <link rel="stylesheet" href="css/styles.css?v=21">
 </head>
 <body>
   <header class="app-toolbar">
@@ -121,7 +121,7 @@
           <button class="text-btn" id="btnCompleteConnection" type="button">Finish line</button>
           <button class="text-btn danger" id="btnClearAllLines" type="button">Clear all</button>
         </div>
-        <div class="repeat-summary-strip" id="digitRepeatSummary" aria-label="Recent repeat and cold digit summary"></div>
+        <div class="repeat-summary-strip" id="digitRepeatSummary" aria-label="Hot, neutral, cold, declining, and emerging digit summary"></div>
         <div class="matrix-scroll" aria-label="Historical draw digit matrix">
           <div class="grid-wrapper" id="gridWrapper">
             <svg class="svg-overlay" id="svgOverlay"></svg>
@@ -136,7 +136,7 @@
           <div><span class="eyebrow">Plan by position</span><h2>Next Draw Board</h2></div>
           <div class="surface-actions"><button class="text-btn" id="btnClearFutureMap" type="button">Clear board</button><button class="btn btn-secondary" id="btnJumpToSlip" type="button">Build slip ↓</button></div>
         </header>
-        <p class="surface-intro">The top three endings in each Ball are ranked from all seven pattern families across up to 50 draws. Scores and walk-forward rates describe historical pattern performance, not the probability of a random lottery result.</p>
+        <p class="surface-intro">Each row is a complete five-number line, assembled from position history, calibrated pattern support, current H/N/C/D/E state, recency, and four-draw proximity. The three lines form a coverage portfolio: no full number repeats, and every Ball column uses three different endings. Standard recommendations also allow no more than two numbers with the same ending. Scores describe historical agreement, not lottery probability.</p>
           <div class="future-map-legend" aria-label="Next draw board legend">
             <span><i class="intuition"></i>Mapped selection</span>
             <span><i class="successor-rank-1"></i>#1</span>
@@ -144,6 +144,10 @@
             <span><i class="successor-rank-3"></i>#3</span>
           </div>
         <div id="futureDigitGrid" class="future-digit-grid"></div>
+        <section class="system-line-panel" aria-labelledby="systemLineTitle">
+          <div class="system-line-heading"><div><span>15-number coverage portfolio</span><h3 id="systemLineTitle">Recommended Complete Lines</h3></div><small>Distinct number + ending coverage</small></div>
+          <div id="futureSystemLines" class="system-line-list"></div>
+        </section>
         <details class="all-digits-disclosure" id="allDigitsDisclosure">
           <summary>Show all digits</summary>
           <p>Historical successor colors show which endings followed the latest digit in the same Ball position.</p>
@@ -222,6 +226,6 @@
   </aside>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  <script type="module" src="js/app.js?v=27"></script>
+  <script type="module" src="js/app.js?v=34"></script>
 </body>
 </html>

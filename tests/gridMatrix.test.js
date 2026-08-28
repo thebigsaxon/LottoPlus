@@ -85,4 +85,7 @@ test('Winning Patterns adds independently checked selectors before draw dates', 
   assert.equal((container.innerHTML.match(/class="winning-row-checkbox"/g) || []).length, 2);
   assert.match(container.innerHTML, /data-winning-row-id="d1"[\s\S]*?2026-08-01/);
   assert.match(container.innerHTML, /data-winning-row-id="d2"[\s\S]*?checked[\s\S]*?2026-08-02/);
+  assert.match(container.innerHTML, /HNCDE status/);
+  assert.match(container.innerHTML, /emerging/);
+  assert.match(container.innerHTML, /declining/);
 });

@@ -21,6 +21,8 @@ test('Cash 5 Studio shell exposes contextual pattern, annotation, and session su
   assert.match(html, /class="tens-reference-toggle"/);
   assert.ok(html.indexOf('id="chkTens"') < html.indexOf('id="btnPatterns"'));
   assert.match(html, /id="futureDigitGrid"/);
+  assert.match(html, /id="futureSystemLines"/);
+  assert.match(html, /Recommended Complete Lines/);
   assert.match(html, /id="futureAllDigitGrid"/);
   assert.match(html, /id="allDigitsDisclosure"/);
   assert.match(html, />Show all digits</);
@@ -65,9 +67,12 @@ test('position highlighting, click-off Patterns, and native sharing are wired', 
   assert.match(appSource, /showLPatterns = e\.target\.checked/);
   assert.match(appSource, /showWinningPatterns = e\.target\.checked/);
   assert.match(appSource, /onWinningRowToggleCallback/);
-  assert.match(appSource, /rankPatternRecommendationsByColumn\(this\.researchDraws, 3\)/);
+  assert.match(appSource, /analyzeNextDrawBoard\(this\.researchDraws, \{ limit: 3 \}\)/);
   assert.match(appSource, /walk-forward hit rate/);
   assert.match(appSource, /pattern-support-list/);
+  assert.match(appSource, /data-use-system-line/);
+  assert.match(appSource, /stream-evidence-grid/);
+  assert.match(appSource, /Analyzer v/);
   assert.match(appSource, /initializePredictionLedger/);
   assert.match(appSource, /reconcileOfficialDraws/);
   assert.match(appSource, /Historical pattern agreement/);
@@ -115,4 +120,15 @@ test('mapped Next Draw digits use a high-contrast circular selection ring', asyn
   assert.match(styles, /\.future-map-cell\.mapped b, \.pattern-recommendation-cell\.mapped b/);
   assert.match(styles, /border: 3px solid var\(--selection-ring\)/);
   assert.match(styles, /border-radius: 50%/);
+});
+
+test('Saved Sessions visibly marks picked numbers found in the actual draw', async () => {
+  const [source, styles] = await Promise.all([
+    readFile(appPath, 'utf8'),
+    readFile(stylesPath, 'utf8')
+  ]);
+  assert.match(source, /drawn-number-match/);
+  assert.match(source, /This picked number appeared in the actual draw/);
+  assert.match(styles, /\.session-card \.ticket-numbers span\.drawn-number-match/);
+  assert.match(styles, /content: "✓"/);
 });
