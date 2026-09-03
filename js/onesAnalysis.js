@@ -3,11 +3,11 @@ export function onesDigit(value) {
 }
 
 export function drawToOnes(draw) {
-  return (draw?.numbers || []).map((number, column) => ({
-    digit: onesDigit(number),
-    number,
-    column
-  }));
+  return (draw?.numbers || []).flatMap((number, column) => {
+    const value = Number(number);
+    if (!Number.isInteger(value) || value < 1 || value > 42) return [];
+    return [{ digit: onesDigit(value), number: value, column }];
+  });
 }
 
 export function arithmeticRelationships(a, b) {

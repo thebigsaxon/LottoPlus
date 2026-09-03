@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { browserRectToSvgSpace, buildAutoPairOffsets, buildAutoRingLayout, ConnectionEngine, isConnectionTool, LINE_COLOR_PALETTE, lPatternOutlinePoints, normalizeManualConnectionChains, roundedPolygonPath, shouldEndConnectionChain, trimConnectionToRings, visibleConnectionColor } from '../js/connectionEngine.js';
+import { browserRectToSvgSpace, buildAutoPairOffsets, buildAutoRingLayout, columnLOutlinePoints, ConnectionEngine, isConnectionTool, LINE_COLOR_PALETTE, lPatternOutlinePoints, normalizeManualConnectionChains, roundedPolygonPath, shouldEndConnectionChain, trimConnectionToRings, visibleConnectionColor } from '../js/connectionEngine.js';
 
 test('Present endpoints complete a connection chain', () => {
   assert.equal(shouldEndConnectionChain('present'), true);
+  assert.equal(shouldEndConnectionChain('next'), true);
   assert.equal(shouldEndConnectionChain('present', 'freeform-line'), false);
   assert.equal(shouldEndConnectionChain('past'), false);
   assert.equal(shouldEndConnectionChain(''), false);
@@ -209,6 +210,36 @@ test('L-pattern outlines exclude the unused fourth corner on either output side'
     { x: -2, y: -2 }, { x: 32, y: -2 }, { x: 32, y: 32 },
     { x: 18, y: 32 }, { x: 18, y: 12 }, { x: -2, y: 12 }
   ]);
+});
+
+test('inverted L outlines keep a vertical stem and a side foot', () => {
+  const stemTop = { left: 10, top: 0, right: 20, bottom: 10 };
+  const stemBottom = { left: 10, top: 20, right: 20, bottom: 30 };
+  const lowerRight = { left: 30, top: 20, right: 40, bottom: 30 };
+  const lowerLeft = { left: 0, top: 20, right: 8, bottom: 30 };
+
+  assert.deepEqual(columnLOutlinePoints([stemTop, stemBottom, lowerRight], 'lower-right', 2), [
+    { x: 8, y: -2 }, { x: 22, y: -2 }, { x: 22, y: 18 },
+    { x: 42, y: 18 }, { x: 42, y: 32 }, { x: 8, y: 32 }
+  ]);
+  assert.deepEqual(columnLOutlinePoints([stemTop, stemBottom, lowerLeft], 'lower-left', 2), [
+    { x: 8, y: -2 }, { x: 22, y: -2 }, { x: 22, y: 32 },
+    { x: -2, y: 32 }, { x: -2, y: 18 }, { x: 8, y: 18 }
+  ]);
+});
+
+test('boxed inverted-L shapes do not also allocate line endpoint rings', () => {
+  const rings = buildAutoRingLayout([
+    {
+      id: 'auto-math-inverted-l-lower-right-a-b-c',
+      fromCellId: 'a',
+      toCellId: 'c',
+      sequenceCellIds: ['a', 'b', 'c'],
+      patternType: 'math-inverted-l',
+      isAuto: true
+    }
+  ]);
+  assert.equal(rings.size, 0);
 });
 
 test('L-pattern polygon paths round both outside and concave corners', () => {

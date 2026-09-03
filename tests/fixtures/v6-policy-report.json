@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-31T01:38:54.015Z",
+  "archiveChecksum": "ef0377d8798287532a1d3f988914add823f5fd9c4b15f634dec00a2a8c877004",
+  "archiveDrawCount": 910,
+  "splits": {
+    "train": [
+      "2024-04-22",
+      "2025-08-30"
+    ],
+    "validation": [
+      "2025-08-31",
+      "2026-02-28"
+    ],
+    "test": [
+      "2026-03-01",
+      "2026-08-29"
+    ]
+  },
+  "trainingResults": [
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.1,
+        "stateWeight": 0,
+        "evidenceId": "evaluation-p0.1-s0"
+      },
+      "rate": 0.07043010752688172
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.2,
+        "stateWeight": 0,
+        "evidenceId": "evaluation-p0.2-s0"
+      },
+      "rate": 0.0696236559139785
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.05,
+        "stateWeight": 0.05,
+        "evidenceId": "evaluation-p0.05-s0.05"
+      },
+      "rate": 0.06948924731182796
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.1,
+        "stateWeight": 0.05,
+        "evidenceId": "evaluation-p0.1-s0.05"
+      },
+      "rate": 0.06948924731182796
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.2,
+        "stateWeight": 0.05,
+        "evidenceId": "evaluation-p0.2-s0.05"
+      },
+      "rate": 0.06895161290322581
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0,
+        "stateWeight": 0.05,
+        "evidenceId": "evaluation-p0-s0.05"
+      },
+      "rate": 0.06841397849462366
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.05,
+        "stateWeight": 0,
+        "evidenceId": "evaluation-p0.05-s0"
+      },
+      "rate": 0.06841397849462366
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.1,
+        "stateWeight": 0.1,
+        "evidenceId": "evaluation-p0.1-s0.1"
+      },
+      "rate": 0.06827956989247312
+    },
+    {
+      "policy": {
+        "kind": "eb50",
+        "priorStrength": 50,
+        "patternWeight": 0,
+        "stateWeight": 0,
+        "evidenceId": "evaluation-eb50"
+      },
+      "rate": 0.06814516129032258
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.05,
+        "stateWeight": 0.1,
+        "evidenceId": "evaluation-p0.05-s0.1"
+      },
+      "rate": 0.06814516129032258
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.2,
+        "stateWeight": 0.1,
+        "evidenceId": "evaluation-p0.2-s0.1"
+      },
+      "rate": 0.06814516129032258
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.05,
+        "stateWeight": 0.2,
+        "evidenceId": "evaluation-p0.05-s0.2"
+      },
+      "rate": 0.0674731182795699
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0,
+        "stateWeight": 0.1,
+        "evidenceId": "evaluation-p0-s0.1"
+      },
+      "rate": 0.06733870967741935
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0,
+        "stateWeight": 0.2,
+        "evidenceId": "evaluation-p0-s0.2"
+      },
+      "rate": 0.06733870967741935
+    },
+    {
+      "policy": {
+        "kind": "challenger",
+        "priorStrength": 50,
+        "patternWeight": 0.1,
+        "stateWeight": 0.2,
+        "evidenceId": "evaluation-p0.1-s0.2"
+      },
+      "rate": 0.06733870967741935
+    }
+  ],
+  "selectedChallenger": {
+    "kind": "challenger",
+    "priorStrength": 50,
+    "patternWeight": 0.1,
+    "stateWeight": 0,
+    "evidenceId": "evaluation-p0.1-s0"
+  },
+  "validation": {
+    "comboRate": 0.0706959706959707,
+    "challengerRate": 0.07692307692307693,
+    "gate": {
+      "drawCount": 182,
+      "lift": 0.0062271062271062275,
+      "liftPercentagePoints": 0.6227106227106227,
+      "confidence": {
+        "lower": -0.0032967032967032967,
+        "upper": 0.01575091575091575,
+        "mean": 0.0062271062271062275,
+        "iterations": 10000
+      },
+      "passed": false
+    }
+  },
+  "test": {
+    "comboRate": 0.07216117216117215,
+    "challengerRate": 0.07142857142857142,
+    "v5Rate": 0.0684981684981685,
+    "challengerGate": {
+      "drawCount": 182,
+      "lift": -0.0007326007326007326,
+      "liftPercentagePoints": -0.07326007326007326,
+      "confidence": {
+        "lower": -0.011721611721611722,
+        "upper": 0.00989010989010989,
+        "mean": -0.0007326007326007326,
+        "iterations": 10000
+      },
+      "passed": false
+    },
+    "comboVsV5": {
+      "drawCount": 182,
+      "lift": 0.003663003663003663,
+      "liftPercentagePoints": 0.3663003663003663,
+      "confidence": {
+        "lower": -0.00695970695970696,
+        "upper": 0.014652014652014652,
+        "mean": 0.003663003663003663,
+        "iterations": 10000
+      },
+      "passed": false
+    }
+  },
+  "simulation": {
+    "seeds": 200,
+    "drawsPerSeed": 500,
+    "evaluated": true,
+    "meanDifference": 0.0023333333333333335,
+    "lowerBound": -0.006333333333333333,
+    "upperBound": 0.011333333333333334,
+    "nonInferiorityMargin": -0.0025,
+    "passed": false,
+    "comparedPolicy": "evaluation-p0.1-s0"
+  },
+  "learnedGatePassed": false,
+  "activePolicy": {
+    "kind": "combo",
+    "priorStrength": 50,
+    "patternWeight": 0,
+    "stateWeight": 0,
+    "evidenceId": "v6-combo-baseline-2026-08-29"
+  },
+  "improvementClaimAllowed": false
+}

@@ -1,0 +1,1437 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-31T01:38:54.015Z",
+  "archiveChecksum": "ef0377d8798287532a1d3f988914add823f5fd9c4b15f634dec00a2a8c877004",
+  "archiveDrawCount": 910,
+  "objective": "Unordered Cash 5 ticket outcomes per paid line; higher hit and prize-tier rates and lower multi-label Brier are better.",
+  "splitDates": {
+    "train": [
+      "2024-03-28",
+      "2025-08-30"
+    ],
+    "validation": [
+      "2025-08-31",
+      "2026-02-28"
+    ],
+    "test": [
+      "2026-03-01",
+      "2026-08-29"
+    ]
+  },
+  "training": [
+    {
+      "track": "structure",
+      "window": "expanding",
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.6250799744081897,
+      "matchTwoRate": 0.10620601407549607,
+      "matchThreeRate": 0.008317338451695458,
+      "brier": 0.10605109185567516,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": 0.028150991682661577,
+        "confidence": {
+          "lower": -0.014715291106845786,
+          "upper": 0.07229686500319889,
+          "mean": 0.028150991682661577,
+          "iterations": 10000
+        },
+        "matchTwoLift": 0.006397952655150351,
+        "matchThreeLift": -0.005118362124120281,
+        "brierLift": -0.0011758084089630739,
+        "passed": false
+      }
+    },
+    {
+      "track": "structure",
+      "window": 25,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.6097248880358286,
+      "matchTwoRate": 0.09916826615483064,
+      "matchThreeRate": 0.007037747920665387,
+      "brier": 0.1060433199649647,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": 0.012795905310300696,
+        "confidence": {
+          "lower": -0.0287907869481766,
+          "upper": 0.055022392834293006,
+          "mean": 0.012795905310300696,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.0006397952655150358,
+        "matchThreeLift": -0.006397952655150351,
+        "brierLift": -0.0011680365182526488,
+        "passed": false
+      }
+    },
+    {
+      "track": "structure",
+      "window": 50,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.6084452975047984,
+      "matchTwoRate": 0.1068458093410111,
+      "matchThreeRate": 0.004478566858605246,
+      "brier": 0.10609702510906144,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": 0.011516314779270634,
+        "confidence": {
+          "lower": -0.03134996801023671,
+          "upper": 0.053742802303262956,
+          "mean": 0.011516314779270634,
+          "iterations": 10000
+        },
+        "matchTwoLift": 0.007037747920665385,
+        "matchThreeLift": -0.008957133717210491,
+        "brierLift": -0.001221741662349434,
+        "passed": false
+      }
+    },
+    {
+      "track": "structure",
+      "window": 100,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.6058861164427387,
+      "matchTwoRate": 0.10236724248240582,
+      "matchThreeRate": 0.008317338451695458,
+      "brier": 0.1060676301149327,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": 0.00895713371721049,
+        "confidence": {
+          "lower": -0.03326935380678178,
+          "upper": 0.05118362124120283,
+          "mean": 0.00895713371721049,
+          "iterations": 10000
+        },
+        "matchTwoLift": 0.0025591810620601446,
+        "matchThreeLift": -0.005118362124120281,
+        "brierLift": -0.0011923466682205988,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": "expanding",
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "structure-heavy",
+        "temporal": 0.25,
+        "structure": 0.5,
+        "hncde": 0.25
+      },
+      "meanHitsPerLine": 0.6020473448496482,
+      "matchTwoRate": 0.0953294945617404,
+      "matchThreeRate": 0.0063979526551503525,
+      "brier": 0.10552703240184592,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": 0.005118362124120279,
+        "confidence": {
+          "lower": -0.037747920665387055,
+          "upper": 0.04734484964811258,
+          "mean": 0.005118362124120279,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.004478566858605248,
+        "matchThreeLift": -0.007037747920665387,
+        "brierLift": -0.0006517489551338503,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 25,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "structure-heavy",
+        "temporal": 0.25,
+        "structure": 0.5,
+        "hncde": 0.25
+      },
+      "meanHitsPerLine": 0.6014075495841329,
+      "matchTwoRate": 0.09149072296865017,
+      "matchThreeRate": 0.004478566858605246,
+      "brier": 0.10553993943041903,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": 0.004478566858605236,
+        "confidence": {
+          "lower": -0.038387715930902115,
+          "upper": 0.04670505438259753,
+          "mean": 0.004478566858605236,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.00831733845169546,
+        "matchThreeLift": -0.008957133717210491,
+        "brierLift": -0.0006646559837070561,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 25,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "balanced",
+        "temporal": 0.3333333333333333,
+        "structure": 0.3333333333333333,
+        "hncde": 0.3333333333333333
+      },
+      "meanHitsPerLine": 0.599488163787588,
+      "matchTwoRate": 0.09724888035828552,
+      "matchThreeRate": 0.009596928982725525,
+      "brier": 0.10548238586530771,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": 0.0025591810620601394,
+        "confidence": {
+          "lower": -0.039667306461932145,
+          "upper": 0.04286628278950738,
+          "mean": 0.0025591810620601394,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.0025591810620601394,
+        "matchThreeLift": -0.0038387715930902097,
+        "brierLift": -0.0006071024185957771,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 100,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "structure-heavy",
+        "temporal": 0.25,
+        "structure": 0.5,
+        "hncde": 0.25
+      },
+      "meanHitsPerLine": 0.5937300063979528,
+      "matchTwoRate": 0.09277031349968023,
+      "matchThreeRate": 0.007677543186180422,
+      "brier": 0.10554747641880555,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.003198976327575162,
+        "confidence": {
+          "lower": -0.04542546385156746,
+          "upper": 0.038387715930902115,
+          "mean": -0.003198976327575162,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.007037747920665388,
+        "matchThreeLift": -0.005758157389635317,
+        "brierLift": -0.0006721929720934595,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 50,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "structure-heavy",
+        "temporal": 0.25,
+        "structure": 0.5,
+        "hncde": 0.25
+      },
+      "meanHitsPerLine": 0.5937300063979526,
+      "matchTwoRate": 0.09468969929622537,
+      "matchThreeRate": 0.005118362124120281,
+      "brier": 0.10558126649591902,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.003198976327575169,
+        "confidence": {
+          "lower": -0.04542546385156748,
+          "upper": 0.03838771593090212,
+          "mean": -0.003198976327575169,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.005118362124120281,
+        "matchThreeLift": -0.008317338451695458,
+        "brierLift": -0.0007059830492069451,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": "expanding",
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "temporal-heavy",
+        "temporal": 0.5,
+        "structure": 0.25,
+        "hncde": 0.25
+      },
+      "meanHitsPerLine": 0.5937300063979527,
+      "matchTwoRate": 0.09021113243762008,
+      "matchThreeRate": 0.007677543186180422,
+      "brier": 0.10545450697314795,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.0031989763275751732,
+        "confidence": {
+          "lower": -0.0441458733205375,
+          "upper": 0.03902751119641714,
+          "mean": -0.0031989763275751732,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.009596928982725532,
+        "matchThreeLift": -0.005758157389635316,
+        "brierLift": -0.0005792235264358449,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 25,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "temporal-heavy",
+        "temporal": 0.5,
+        "structure": 0.25,
+        "hncde": 0.25
+      },
+      "meanHitsPerLine": 0.5924504158669226,
+      "matchTwoRate": 0.08765195137555994,
+      "matchThreeRate": 0.008317338451695458,
+      "brier": 0.10549617652104558,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.004478566858605247,
+        "confidence": {
+          "lower": -0.04606525911708255,
+          "upper": 0.03646833013435702,
+          "mean": -0.004478566858605247,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.012156110044785666,
+        "matchThreeLift": -0.00511836212412028,
+        "brierLift": -0.0006208930743335521,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 100,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "temporal-heavy",
+        "temporal": 0.5,
+        "structure": 0.25,
+        "hncde": 0.25
+      },
+      "meanHitsPerLine": 0.5892514395393473,
+      "matchTwoRate": 0.10172744721689077,
+      "matchThreeRate": 0.005118362124120281,
+      "brier": 0.10547767137224663,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.007677543186180419,
+        "confidence": {
+          "lower": -0.04926423544465772,
+          "upper": 0.033909149072296876,
+          "mean": -0.007677543186180419,
+          "iterations": 10000
+        },
+        "matchTwoLift": 0.0019193857965451042,
+        "matchThreeLift": -0.008317338451695458,
+        "brierLift": -0.0006023879255346176,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 25,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "hncde-heavy",
+        "temporal": 0.25,
+        "structure": 0.25,
+        "hncde": 0.5
+      },
+      "meanHitsPerLine": 0.5886116442738323,
+      "matchTwoRate": 0.09468969929622538,
+      "matchThreeRate": 0.0038387715930902106,
+      "brier": 0.10546342647152453,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.008317338451695458,
+        "confidence": {
+          "lower": -0.049264235444657696,
+          "upper": 0.03198976327575173,
+          "mean": -0.008317338451695458,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.0051183621241202805,
+        "matchThreeLift": -0.009596928982725525,
+        "brierLift": -0.0005881430248124942,
+        "passed": false
+      }
+    },
+    {
+      "track": "hncde",
+      "window": 25,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.586052463211772,
+      "matchTwoRate": 0.09788867562380055,
+      "matchThreeRate": 0.004478566858605246,
+      "brier": 0.10555024754827123,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.010876519513755588,
+        "confidence": {
+          "lower": -0.051823416506717804,
+          "upper": 0.02943058221369159,
+          "mean": -0.010876519513755588,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.0019193857965451094,
+        "matchThreeLift": -0.008957133717210491,
+        "brierLift": -0.0006749641015591218,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 50,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "temporal-heavy",
+        "temporal": 0.5,
+        "structure": 0.25,
+        "hncde": 0.25
+      },
+      "meanHitsPerLine": 0.5847728726807419,
+      "matchTwoRate": 0.0908509277031351,
+      "matchThreeRate": 0.004478566858605246,
+      "brier": 0.10551447519925336,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.012156110044785636,
+        "confidence": {
+          "lower": -0.05310300703774792,
+          "upper": 0.028150991682661528,
+          "mean": -0.012156110044785636,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.008957133717210493,
+        "matchThreeLift": -0.008957133717210491,
+        "brierLift": -0.0006391917525413434,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": "expanding",
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "balanced",
+        "temporal": 0.3333333333333333,
+        "structure": 0.3333333333333333,
+        "hncde": 0.3333333333333333
+      },
+      "meanHitsPerLine": 0.5847728726807417,
+      "matchTwoRate": 0.08701215611004488,
+      "matchThreeRate": 0.005118362124120281,
+      "brier": 0.10546741921693412,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.012156110044785652,
+        "confidence": {
+          "lower": -0.054382597568778016,
+          "upper": 0.030070377479206645,
+          "mean": -0.012156110044785652,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.012795905310300703,
+        "matchThreeLift": -0.008317338451695458,
+        "brierLift": -0.000592135770221955,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 100,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "balanced",
+        "temporal": 0.3333333333333333,
+        "structure": 0.3333333333333333,
+        "hncde": 0.3333333333333333
+      },
+      "meanHitsPerLine": 0.5834932821497119,
+      "matchTwoRate": 0.08765195137555992,
+      "matchThreeRate": 0.0063979526551503525,
+      "brier": 0.10548924270463982,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.013435700575815746,
+        "confidence": {
+          "lower": -0.05566218809980803,
+          "upper": 0.02751119641714652,
+          "mean": -0.013435700575815746,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.012156110044785673,
+        "matchThreeLift": -0.007037747920665387,
+        "brierLift": -0.0006139592579277719,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": "expanding",
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "hncde-heavy",
+        "temporal": 0.25,
+        "structure": 0.25,
+        "hncde": 0.5
+      },
+      "meanHitsPerLine": 0.5796545105566223,
+      "matchTwoRate": 0.09021113243762006,
+      "matchThreeRate": 0.0063979526551503525,
+      "brier": 0.1054767154565729,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.01727447216890595,
+        "confidence": {
+          "lower": -0.058861164427383234,
+          "upper": 0.024952015355086357,
+          "mean": -0.01727447216890595,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.009596928982725536,
+        "matchThreeLift": -0.0070377479206653855,
+        "brierLift": -0.0006014320098607429,
+        "passed": false
+      }
+    },
+    {
+      "track": "temporal",
+      "window": 50,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.5790147152911067,
+      "matchTwoRate": 0.0844529750479847,
+      "matchThreeRate": 0.004478566858605246,
+      "brier": 0.10562814456614938,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.017914267434420986,
+        "confidence": {
+          "lower": -0.057581573896353176,
+          "upper": 0.021753039027511197,
+          "mean": -0.017914267434420986,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.015355086372360851,
+        "matchThreeLift": -0.008957133717210491,
+        "brierLift": -0.0007528611194374353,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 50,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "balanced",
+        "temporal": 0.3333333333333333,
+        "structure": 0.3333333333333333,
+        "hncde": 0.3333333333333333
+      },
+      "meanHitsPerLine": 0.5790147152911066,
+      "matchTwoRate": 0.08317338451695463,
+      "matchThreeRate": 0.007037747920665387,
+      "brier": 0.10552458963142752,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.017914267434420997,
+        "confidence": {
+          "lower": -0.05950095969289826,
+          "upper": 0.023672424824056276,
+          "mean": -0.017914267434420997,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.01663467690339092,
+        "matchThreeLift": -0.0063979526551503525,
+        "brierLift": -0.0006493061847155872,
+        "passed": false
+      }
+    },
+    {
+      "track": "hncde",
+      "window": "expanding",
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.5783749200255913,
+      "matchTwoRate": 0.10236724248240578,
+      "matchThreeRate": 0.005118362124120281,
+      "brier": 0.10567451570761949,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.018554062699935998,
+        "confidence": {
+          "lower": -0.06206014075495838,
+          "upper": 0.024952015355086333,
+          "mean": -0.018554062699935998,
+          "iterations": 10000
+        },
+        "matchTwoLift": 0.0025591810620601415,
+        "matchThreeLift": -0.008317338451695458,
+        "brierLift": -0.0007992322609073671,
+        "passed": false
+      }
+    },
+    {
+      "track": "hncde",
+      "window": 100,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.5770953294945617,
+      "matchTwoRate": 0.09404990403071026,
+      "matchThreeRate": 0.004478566858605246,
+      "brier": 0.10569661696800535,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.019833653230966083,
+        "confidence": {
+          "lower": -0.06142034548944334,
+          "upper": 0.021113243761996116,
+          "mean": -0.019833653230966083,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.00575815738963531,
+        "matchThreeLift": -0.008957133717210491,
+        "brierLift": -0.0008213335212932803,
+        "passed": false
+      }
+    },
+    {
+      "track": "temporal",
+      "window": 25,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.5751759436980168,
+      "matchTwoRate": 0.09277031349968025,
+      "matchThreeRate": 0.005758157389635317,
+      "brier": 0.10567883317370137,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.021753039027511193,
+        "confidence": {
+          "lower": -0.06206014075495843,
+          "upper": 0.01919385796545104,
+          "mean": -0.021753039027511193,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.007037747920665386,
+        "matchThreeLift": -0.007677543186180422,
+        "brierLift": -0.0008035497269892996,
+        "passed": false
+      }
+    },
+    {
+      "track": "temporal",
+      "window": "expanding",
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.5745361484325013,
+      "matchTwoRate": 0.09149072296865013,
+      "matchThreeRate": 0.008317338451695458,
+      "brier": 0.10555951266664325,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.022392834293026232,
+        "confidence": {
+          "lower": -0.062060140754958415,
+          "upper": 0.017274472168905975,
+          "mean": -0.022392834293026232,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.008317338451695461,
+        "matchThreeLift": -0.005118362124120281,
+        "brierLift": -0.000684229219931137,
+        "passed": false
+      }
+    },
+    {
+      "track": "temporal",
+      "window": 100,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.5738963531669866,
+      "matchTwoRate": 0.09277031349968022,
+      "matchThreeRate": 0.004478566858605246,
+      "brier": 0.10558682860991153,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.02303262955854125,
+        "confidence": {
+          "lower": -0.06333973128598847,
+          "upper": 0.017914267434420976,
+          "mean": -0.02303262955854125,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.007037747920665385,
+        "matchThreeLift": -0.008957133717210491,
+        "brierLift": -0.0007115451631994501,
+        "passed": false
+      }
+    },
+    {
+      "track": "hncde",
+      "window": 50,
+      "pivotMode": "high",
+      "combinationWeights": null,
+      "meanHitsPerLine": 0.5726167626359568,
+      "matchTwoRate": 0.09468969929622532,
+      "matchThreeRate": 0.008957133717210491,
+      "brier": 0.10573251379825575,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.024312220089571353,
+        "confidence": {
+          "lower": -0.06589891234804865,
+          "upper": 0.016634676903390905,
+          "mean": -0.024312220089571353,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.005118362124120279,
+        "matchThreeLift": -0.004478566858605246,
+        "brierLift": -0.0008572303515437052,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 50,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "hncde-heavy",
+        "temporal": 0.25,
+        "structure": 0.25,
+        "hncde": 0.5
+      },
+      "meanHitsPerLine": 0.5719769673704416,
+      "matchTwoRate": 0.09532949456174038,
+      "matchThreeRate": 0.0038387715930902106,
+      "brier": 0.105534091248346,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.02495201535508636,
+        "confidence": {
+          "lower": -0.06653870761356366,
+          "upper": 0.015994881637875904,
+          "mean": -0.02495201535508636,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.004478566858605244,
+        "matchThreeLift": -0.009596928982725525,
+        "brierLift": -0.0006588078016340042,
+        "passed": false
+      }
+    },
+    {
+      "track": "combined",
+      "window": 100,
+      "pivotMode": "high",
+      "combinationWeights": {
+        "label": "hncde-heavy",
+        "temporal": 0.25,
+        "structure": 0.25,
+        "hncde": 0.5
+      },
+      "meanHitsPerLine": 0.5719769673704417,
+      "matchTwoRate": 0.08573256557901479,
+      "matchThreeRate": 0.004478566858605246,
+      "brier": 0.10549860829990386,
+      "control": {
+        "draws": 521,
+        "meanHitsPerLine": 0.5969289827255274,
+        "matchTwoRate": 0.09980806142034564,
+        "matchThreeRate": 0.013435700575815734,
+        "matchFourRate": 0,
+        "matchFiveRate": 0,
+        "portfolioCoverage": 1.7907869481765835,
+        "bestLineHits": 1.2322456813819578,
+        "brier": 0.1048752834467112
+      },
+      "comparison": {
+        "draws": 521,
+        "meanHitLift": -0.024952015355086364,
+        "confidence": {
+          "lower": -0.06525911708253367,
+          "upper": 0.01599488163787588,
+          "mean": -0.024952015355086364,
+          "iterations": 10000
+        },
+        "matchTwoLift": -0.014075495841330771,
+        "matchThreeLift": -0.008957133717210491,
+        "brierLift": -0.0006233248531918649,
+        "passed": false
+      }
+    }
+  ],
+  "pivotCalibration": {
+    "selectedMode": "high",
+    "training": [
+      {
+        "pivotMode": "high",
+        "window": "expanding",
+        "meanHitsPerLine": 0.6250799744081897,
+        "matchTwoRate": 0.10620601407549607,
+        "matchThreeRate": 0.008317338451695458,
+        "brier": 0.10605109185567516,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": 0.028150991682661577,
+          "confidence": {
+            "lower": -0.014715291106845786,
+            "upper": 0.07229686500319889,
+            "mean": 0.028150991682661577,
+            "iterations": 10000
+          },
+          "matchTwoLift": 0.006397952655150351,
+          "matchThreeLift": -0.005118362124120281,
+          "brierLift": -0.0011758084089630739,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "high",
+        "window": 25,
+        "meanHitsPerLine": 0.6097248880358286,
+        "matchTwoRate": 0.09916826615483064,
+        "matchThreeRate": 0.007037747920665387,
+        "brier": 0.1060433199649647,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": 0.012795905310300696,
+          "confidence": {
+            "lower": -0.0287907869481766,
+            "upper": 0.055022392834293006,
+            "mean": 0.012795905310300696,
+            "iterations": 10000
+          },
+          "matchTwoLift": -0.0006397952655150358,
+          "matchThreeLift": -0.006397952655150351,
+          "brierLift": -0.0011680365182526488,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "low",
+        "window": 25,
+        "meanHitsPerLine": 0.6090850927703134,
+        "matchTwoRate": 0.1068458093410111,
+        "matchThreeRate": 0.01151631477927063,
+        "brier": 0.10638653354448557,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": 0.012156110044785668,
+          "confidence": {
+            "lower": -0.028790786948176612,
+            "upper": 0.0537428023032629,
+            "mean": 0.012156110044785668,
+            "iterations": 10000
+          },
+          "matchTwoLift": 0.0070377479206653855,
+          "matchThreeLift": -0.001919385796545105,
+          "brierLift": -0.0015112500977734005,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "high",
+        "window": 50,
+        "meanHitsPerLine": 0.6084452975047984,
+        "matchTwoRate": 0.1068458093410111,
+        "matchThreeRate": 0.004478566858605246,
+        "brier": 0.10609702510906144,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": 0.011516314779270634,
+          "confidence": {
+            "lower": -0.03134996801023671,
+            "upper": 0.053742802303262956,
+            "mean": 0.011516314779270634,
+            "iterations": 10000
+          },
+          "matchTwoLift": 0.007037747920665385,
+          "matchThreeLift": -0.008957133717210491,
+          "brierLift": -0.001221741662349434,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "high",
+        "window": 100,
+        "meanHitsPerLine": 0.6058861164427387,
+        "matchTwoRate": 0.10236724248240582,
+        "matchThreeRate": 0.008317338451695458,
+        "brier": 0.1060676301149327,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": 0.00895713371721049,
+          "confidence": {
+            "lower": -0.03326935380678178,
+            "upper": 0.05118362124120283,
+            "mean": 0.00895713371721049,
+            "iterations": 10000
+          },
+          "matchTwoLift": 0.0025591810620601446,
+          "matchThreeLift": -0.005118362124120281,
+          "brierLift": -0.0011923466682205988,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "low",
+        "window": 100,
+        "meanHitsPerLine": 0.6001279590531029,
+        "matchTwoRate": 0.10620601407549607,
+        "matchThreeRate": 0.008317338451695458,
+        "brier": 0.1064070122692517,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": 0.0031989763275751867,
+          "confidence": {
+            "lower": -0.037747920665387055,
+            "upper": 0.04478566858605246,
+            "mean": 0.0031989763275751867,
+            "iterations": 10000
+          },
+          "matchTwoLift": 0.0063979526551503525,
+          "matchThreeLift": -0.005118362124120281,
+          "brierLift": -0.0015317288225396674,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "low",
+        "window": "expanding",
+        "meanHitsPerLine": 0.600127959053103,
+        "matchTwoRate": 0.10684580934101112,
+        "matchThreeRate": 0.0063979526551503525,
+        "brier": 0.10638767619257714,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": 0.0031989763275751815,
+          "confidence": {
+            "lower": -0.038387715930902115,
+            "upper": 0.04542546385156751,
+            "mean": 0.0031989763275751815,
+            "iterations": 10000
+          },
+          "matchTwoLift": 0.007037747920665387,
+          "matchThreeLift": -0.007037747920665387,
+          "brierLift": -0.001512392745865053,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "both",
+        "window": 25,
+        "meanHitsPerLine": 0.5975687779910429,
+        "matchTwoRate": 0.08829174664107492,
+        "matchThreeRate": 0.0063979526551503525,
+        "brier": 0.10582209035509726,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": 0.0006397952655150434,
+          "confidence": {
+            "lower": -0.040946896992962244,
+            "upper": 0.042866282789507326,
+            "mean": 0.0006397952655150434,
+            "iterations": 10000
+          },
+          "matchTwoLift": -0.011516314779270634,
+          "matchThreeLift": -0.007037747920665387,
+          "brierLift": -0.0009468069083851051,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "low",
+        "window": 50,
+        "meanHitsPerLine": 0.5969289827255277,
+        "matchTwoRate": 0.10172744721689073,
+        "matchThreeRate": 0.005118362124120281,
+        "brier": 0.10643364616402265,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": -3.8357033480331705e-18,
+          "confidence": {
+            "lower": -0.0409468969929624,
+            "upper": 0.04158669225847728,
+            "mean": -3.8357033480331705e-18,
+            "iterations": 10000
+          },
+          "matchTwoLift": 0.001919385796545106,
+          "matchThreeLift": -0.008317338451695458,
+          "brierLift": -0.0015583627173105818,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "both",
+        "window": 100,
+        "meanHitsPerLine": 0.5911708253358926,
+        "matchTwoRate": 0.09916826615483061,
+        "matchThreeRate": 0.007037747920665387,
+        "brier": 0.10583722364683008,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": -0.005758157389635325,
+          "confidence": {
+            "lower": -0.045425463851567524,
+            "upper": 0.0345489443378119,
+            "mean": -0.005758157389635325,
+            "iterations": 10000
+          },
+          "matchTwoLift": -0.0006397952655150354,
+          "matchThreeLift": -0.0063979526551503525,
+          "brierLift": -0.0009619402001180698,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "both",
+        "window": "expanding",
+        "meanHitsPerLine": 0.5905310300703775,
+        "matchTwoRate": 0.09660908509277046,
+        "matchThreeRate": 0.008317338451695458,
+        "brier": 0.10581820388257565,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": -0.00639795265515036,
+          "confidence": {
+            "lower": -0.04798464491362761,
+            "upper": 0.03518873960332691,
+            "mean": -0.00639795265515036,
+            "iterations": 10000
+          },
+          "matchTwoLift": -0.0031989763275751763,
+          "matchThreeLift": -0.005118362124120281,
+          "brierLift": -0.0009429204358636197,
+          "passed": false
+        }
+      },
+      {
+        "pivotMode": "both",
+        "window": 50,
+        "meanHitsPerLine": 0.586052463211772,
+        "matchTwoRate": 0.09596928982725542,
+        "matchThreeRate": 0.009596928982725525,
+        "brier": 0.10586570980673822,
+        "comparison": {
+          "draws": 521,
+          "meanHitLift": -0.01087651951375559,
+          "confidence": {
+            "lower": -0.051183621241202806,
+            "upper": 0.02943058221369166,
+            "mean": -0.01087651951375559,
+            "iterations": 10000
+          },
+          "matchTwoLift": -0.0038387715930902145,
+          "matchThreeLift": -0.0038387715930902106,
+          "brierLift": -0.0009904263600260422,
+          "passed": false
+        }
+      }
+    ]
+  },
+  "selectedChallenger": {
+    "track": "structure",
+    "window": "expanding",
+    "pivotMode": "high",
+    "combinationWeights": null
+  },
+  "validation": {
+    "control": {
+      "draws": 182,
+      "meanHitsPerLine": 0.5714285714285713,
+      "matchTwoRate": 0.08791208791208795,
+      "matchThreeRate": 0.007326007326007326,
+      "matchFourRate": 0,
+      "matchFiveRate": 0,
+      "portfolioCoverage": 1.7142857142857142,
+      "bestLineHits": 1.164835164835165,
+      "brier": 0.10487528344671193
+    },
+    "challenger": {
+      "draws": 182,
+      "meanHitsPerLine": 0.6336996336996332,
+      "matchTwoRate": 0.13003663003663,
+      "matchThreeRate": 0.007326007326007326,
+      "matchFourRate": 0,
+      "matchFiveRate": 0,
+      "portfolioCoverage": 1.901098901098901,
+      "bestLineHits": 1.3131868131868132,
+      "brier": 0.10571140138753327
+    },
+    "gate": {
+      "draws": 182,
+      "meanHitLift": 0.062271062271062265,
+      "confidence": {
+        "lower": -0.009157509157509151,
+        "upper": 0.1336996336996337,
+        "mean": 0.062271062271062265,
+        "iterations": 10000
+      },
+      "matchTwoLift": 0.042124542124542134,
+      "matchThreeLift": 0,
+      "brierLift": -0.000836117940821226,
+      "passed": false
+    }
+  },
+  "test": {
+    "control": {
+      "draws": 182,
+      "meanHitsPerLine": 0.5860805860805859,
+      "matchTwoRate": 0.09890109890109892,
+      "matchThreeRate": 0.009157509157509156,
+      "matchFourRate": 0,
+      "matchFiveRate": 0,
+      "portfolioCoverage": 1.7582417582417582,
+      "bestLineHits": 1.2032967032967032,
+      "brier": 0.10487528344671194
+    },
+    "challenger": {
+      "draws": 182,
+      "meanHitsPerLine": 0.6153846153846152,
+      "matchTwoRate": 0.11538461538461532,
+      "matchThreeRate": 0.012820512820512818,
+      "matchFourRate": 0,
+      "matchFiveRate": 0,
+      "portfolioCoverage": 1.8461538461538463,
+      "bestLineHits": 1.2527472527472527,
+      "brier": 0.10612807454387561
+    },
+    "gate": {
+      "draws": 182,
+      "meanHitLift": 0.029304029304029297,
+      "confidence": {
+        "lower": -0.049450549450549434,
+        "upper": 0.10622710622710614,
+        "mean": 0.029304029304029297,
+        "iterations": 10000
+      },
+      "matchTwoLift": 0.016483516483516477,
+      "matchThreeLift": 0.0036630036630036634,
+      "brierLift": -0.001252791097163565,
+      "passed": false
+    }
+  },
+  "promotionAllowed": false,
+  "activeTrack": "control",
+  "pivotMode": "high"
+}

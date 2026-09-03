@@ -3,11 +3,15 @@ import assert from 'node:assert/strict';
 import { SAMPLE_CASH_5 } from '../js/sampleData.js';
 import {
   analyzeNextDrawBoard,
+  analyzeNextDrawBoardV5,
   buildOptimizedSystemLines,
+  buildOptimizedSystemLinesV5,
   feasibleRangeForColumn,
   projectNextPatternSignals,
   rankPatternRecommendationsByColumn,
-  walkForwardPatternPerformance
+  scoreNextDrawColumnsV6,
+  walkForwardPatternPerformance,
+  walkForwardPatternPerformanceV5
 } from '../js/patternRecommendations.js';
 
 const sourceDraws = [
@@ -43,10 +47,10 @@ const CURRENT_FIFTY = [
   ['2026-07-09', [5, 11, 23, 25, 39]], ['2026-07-08', [3, 18, 25, 35, 41]]
 ].map(([date, numbers], index) => ({ id: `fixture-${index}`, date, numbers }));
 
-test('pattern projections include all seven families, directions, and concrete Ball targets', () => {
+test('pattern projections include legacy and newly established families with concrete Ball targets', () => {
   const signals = projectNextPatternSignals(sourceDraws);
   assert.deepEqual([...new Set(signals.map(signal => signal.pattern))].sort(), [
-    'diagonal', 'inline', 'lPattern', 'repeat', 'sister', 'sisterOutput', 'vertical'
+    'consecutive', 'diagonal', 'inline', 'invertedL', 'lPattern', 'repeat', 'sister', 'sisterOutput', 'vertical'
   ]);
   assert.ok(signals.every(signal => Number.isInteger(signal.targetColumn)
     && signal.targetColumn >= 0 && signal.targetColumn < 5
@@ -65,15 +69,15 @@ test('mirrored diagonal, sister-output, and L signals route to intended columns'
     && signal.sourceColumns.join(',') === '0,1' && signal.targetColumn === 1 && signal.direction === 1));
 });
 
-test('version 5 produces distinct position-specific candidate sets', () => {
-  const analysis = analyzeNextDrawBoard(CURRENT_FIFTY);
+test('frozen version 5 remains available for evaluation comparisons', () => {
+  const analysis = analyzeNextDrawBoardV5(CURRENT_FIFTY);
   assert.equal(analysis.version, 5);
   analysis.columns.forEach(column => assert.equal(new Set(column.candidates.map(candidate => candidate.digit)).size, 3));
   assert.ok(new Set(analysis.columns.map(column => column.candidates.map(candidate => candidate.digit).join(','))).size > 2);
 });
 
 test('ending candidates use position frequency, pattern lift, and HNCDE state', () => {
-  const analysis = analyzeNextDrawBoard(CURRENT_FIFTY);
+  const analysis = analyzeNextDrawBoardV5(CURRENT_FIFTY);
   analysis.columns.forEach((column, index) => {
     assert.equal(column.column, index);
     assert.equal(new Set(column.candidates.map(candidate => candidate.digit)).size, 3);
@@ -93,7 +97,7 @@ test('ending candidates use position frequency, pattern lift, and HNCDE state', 
 });
 
 test('full-number history uses latest plus prior three without excluding repeats', () => {
-  const analysis = analyzeNextDrawBoard(CURRENT_FIFTY, { includeWalkForward: false });
+  const analysis = analyzeNextDrawBoardV5(CURRENT_FIFTY, { includeWalkForward: false });
   const first = analysis.columns[0];
   assert.deepEqual(first.stream.recentValues, [1, 16, 2, 14]);
   assert.deepEqual(first.stream.deltas, [15, -14, 12]);
@@ -151,6 +155,50 @@ test('optimized lines are increasing, avoid triple endings, and reuse no numbers
   }
 });
 
+test('joint portfolio search beats sequential strongest-line-first assembly when greedy is suboptimal', () => {
+  const numberPools = [
+    [1, 2, 3, 4, 5],
+    [11, 12, 13, 14, 15],
+    [21, 22, 23, 24, 25],
+    [31, 32, 33, 34, 35],
+    [38, 39, 40, 41, 42]
+  ];
+  const columns = numberPools.map((numbers, column) => ({
+    column,
+    available: true,
+    numberCandidates: numbers.map((number, index) => {
+      const probability = (5 - index) / 10;
+      return {
+        number,
+        digit: number % 10,
+        modelProbability: probability,
+        endingProbability: probability,
+        tensProbability: probability,
+        combinedScore: probability * 100,
+        endingScore: probability * 100,
+        numberScore: probability * 100,
+        patternScore: 0,
+        streamScore: 0
+      };
+    })
+  }));
+  const joint = buildOptimizedSystemLines(columns, 3);
+  const greedy = buildOptimizedSystemLinesV5(columns, 3);
+  const jointExact = joint.reduce((sum, line) => sum + line.expectedExactHits, 0);
+  const greedyExact = greedy.reduce((sum, line) => (
+    sum + line.positions.reduce((lineSum, item) => lineSum + item.modelProbability, 0)
+  ), 0);
+
+  assert.deepEqual(joint.map(line => line.numbers), [
+    [1, 11, 22, 32, 38],
+    [3, 13, 21, 31, 40],
+    [2, 12, 23, 33, 39]
+  ]);
+  assert.ok(jointExact > greedyExact);
+  assert.equal(Math.round(jointExact * 10), 60);
+  assert.equal(Math.round(greedyExact * 10), 58);
+});
+
 test('whole-line assembly rejects a higher-scoring triple-ending math line', () => {
   const topNumbers = [1, 13, 23, 33, 42];
   const alternatives = [2, 14, 24, 34, 41];
@@ -184,7 +232,7 @@ test('previously used numbers remain eligible instead of making a Ball unavailab
   }));
   const analysis = analyzeNextDrawBoard(draws, { includeWalkForward: false });
   assert.equal(analysis.columns[0].available, true);
-  assert.ok(analysis.columns[0].numberCandidates.some(candidate => candidate.appearances > 0));
+  assert.ok(analysis.columns[0].numberCandidates.some(candidate => candidate.numberAppearances > 0));
   assert.ok(analysis.lines.some(line => line.available));
 });
 
@@ -203,10 +251,25 @@ test('ranking is chronological and restricted to newest 50 valid draws', () => {
   );
 });
 
-test('walk-forward evaluations are leakage-free and reported per Ball and rank', () => {
+test('EB50 probabilities ignore observations older than the latest 50 draws', () => {
+  const older = [
+    { date: '2026-07-06', numbers: [1, 2, 3, 4, 5] },
+    { date: '2026-07-07', numbers: [5, 6, 7, 8, 9] }
+  ];
+  const policy = {
+    kind: 'eb50', priorStrength: 50, patternWeight: 0, stateWeight: 0,
+    evidenceId: 'test-eb50'
+  };
+  assert.deepEqual(
+    scoreNextDrawColumnsV6([...older, ...CURRENT_FIFTY], 3, policy),
+    scoreNextDrawColumnsV6(CURRENT_FIFTY, 3, policy)
+  );
+});
+
+test('frozen v5 walk-forward evaluations remain leakage-free and reported per Ball and rank', () => {
   const prefix = CURRENT_FIFTY.slice(1);
-  const prefixPerformance = walkForwardPatternPerformance(prefix);
-  const fullPerformance = walkForwardPatternPerformance(CURRENT_FIFTY);
+  const prefixPerformance = walkForwardPatternPerformanceV5(prefix);
+  const fullPerformance = walkForwardPatternPerformanceV5(CURRENT_FIFTY);
   const finalDate = [...CURRENT_FIFTY].sort((a, b) => a.date.localeCompare(b.date)).at(-1).date;
   assert.deepEqual(
     fullPerformance.evaluations.filter(evaluation => evaluation.targetDate !== finalDate),
@@ -220,9 +283,76 @@ test('walk-forward evaluations are leakage-free and reported per Ball and rank',
   });
 });
 
-test('empty history is empty and fewer than four draws are explicitly unavailable', () => {
+test('empty history is empty and the evidence model supports sparse valid history', () => {
   assert.deepEqual(rankPatternRecommendationsByColumn([]), []);
   const rankings = rankPatternRecommendationsByColumn(SAMPLE_CASH_5.slice(0, 3));
   assert.equal(rankings.length, 5);
-  assert.ok(rankings.every(result => !result.available && result.candidates.length === 0));
+  assert.ok(rankings.every(result => result.available && result.candidates.length === 3));
+});
+
+test('version 10 still exposes four independently scored study tracks', () => {
+  const analysis = analyzeNextDrawBoard(CURRENT_FIFTY, { includeWalkForward: false });
+  assert.equal(analysis.version, 10);
+  assert.equal(analysis.policy.kind, 'control');
+  assert.equal(analysis.policy.patternWeight, 0);
+  assert.equal(analysis.policy.historyWeight, 0);
+  assert.equal(analysis.targetAfterDate, '2026-08-26');
+  analysis.columns.forEach(column => {
+    assert.ok(Math.abs(column.allCandidates.reduce((sum, candidate) => sum + candidate.endingProbability, 0) - 1) < 1e-9);
+    column.numberCandidates.forEach(candidate => {
+      assert.ok(candidate.comboProbability > 0 && candidate.comboProbability <= 1);
+      assert.ok(candidate.endingProbability > 0 && candidate.endingProbability <= 1);
+      assert.ok(Math.abs(candidate.endingProbability - candidate.comboEndingProbability) < 1e-12);
+      assert.ok(candidate.tensProbability > 0 && candidate.tensProbability <= 1);
+      assert.ok(candidate.historyProbability > 0 && candidate.historyProbability <= 1);
+      assert.ok(candidate.patternProbability > 0 && candidate.patternProbability <= 1);
+      assert.ok(candidate.stateProbability > 0 && candidate.stateProbability <= 1);
+    });
+    const patternMass = column.allCandidates.reduce((sum, candidate) => sum + candidate.patternProbability, 0);
+    const comboMass = column.allCandidates.reduce((sum, candidate) => sum + candidate.comboEndingProbability, 0);
+    assert.ok(Math.abs(patternMass - 1) < 1e-9);
+    assert.ok(Math.abs(comboMass - 1) < 1e-9);
+    assert.notDeepEqual(
+      column.allCandidates.map(candidate => candidate.patternProbability),
+      column.allCandidates.map(candidate => candidate.comboEndingProbability)
+    );
+    assert.ok(column.sourceTops.combo.digit >= 0 && column.sourceTops.combo.digit <= 9);
+  });
+  assert.equal(analysis.sourceForecasts.length, 5);
+  assert.deepEqual(analysis.trackForecasts.map(track => track.key), ['control', 'temporal', 'structure', 'hncde']);
+  assert.deepEqual(analysis.trackForecasts.map(track => track.status), ['control', 'study', 'study', 'study']);
+  assert.equal(analysis.promotionPolicy.activeTrack, 'control');
+  assert.equal(analysis.promotionPolicy.promotedTrack, null);
+  const pivot = analysis.trackForecasts.find(track => track.key === 'structure').pivotEvidence;
+  assert.equal(pivot.sourceDate, '2026-08-26');
+  assert.ok(pivot.columns.every(column => column.candidates.every(candidate => (
+    candidate.number >= column.column + 1 && candidate.number <= 38 + column.column
+  ))));
+  assert.equal(analysis.lines.length, 3);
+  assert.equal(new Set(analysis.lines.flatMap(line => line.numbers)).size, 15);
+  analysis.lines.forEach(line => assert.equal(line.sourceTrack, 'control'));
+  assert.equal(analysis.portfolio.uniqueNumberCount, 15);
+  assert.ok(analysis.portfolio.expectedUnorderedHits > 0);
+  assert.ok(analysis.portfolio.expectedExactHits > 0);
+});
+
+test('v6 walk-forward statistics are candidate-specific rather than rank slots', () => {
+  const performance = walkForwardPatternPerformance(CURRENT_FIFTY);
+  assert.ok(performance.candidateStats.length > 0);
+  assert.ok(performance.candidateStats.every(stats => Number.isInteger(stats.digit)
+    && Number.isInteger(stats.number) && stats.policy === 'control'));
+  assert.equal(new Set(performance.candidateStats.map(stats => `${stats.column}:${stats.digit}:${stats.number}`)).size, performance.candidateStats.length);
+});
+
+test('new draw history leaves the combo line vote unchanged while study tracks can move', () => {
+  const before = analyzeNextDrawBoard(CURRENT_FIFTY.slice(1), { includeWalkForward: false });
+  const throughLatest = analyzeNextDrawBoard(CURRENT_FIFTY, { includeWalkForward: false });
+  assert.deepEqual(
+    before.columns.map(column => column.allCandidates.map(candidate => candidate.endingProbability)),
+    throughLatest.columns.map(column => column.allCandidates.map(candidate => candidate.endingProbability))
+  );
+  assert.notDeepEqual(
+    before.columns.map(column => column.allCandidates.map(candidate => candidate.historyProbability)),
+    throughLatest.columns.map(column => column.allCandidates.map(candidate => candidate.historyProbability))
+  );
 });

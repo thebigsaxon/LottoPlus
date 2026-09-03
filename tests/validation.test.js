@@ -79,7 +79,8 @@ test('validateProject filters out invalid draws and validates project structure'
       { id: '3', date: '2026-08-03', numbers: [10, 20, 30, 40, 42] }
     ],
     manualLines: [
-      { fromCellId: '1-b0-tens', toCellId: '3-b0-tens' }
+      { fromCellId: '1-b0-tens', toCellId: '3-b0-tens' },
+      { fromCellId: '1-b1-tens', toCellId: '1-b1-ones' }
     ]
   };
 
@@ -87,6 +88,8 @@ test('validateProject filters out invalid draws and validates project structure'
   assert.equal(res.valid, true);
   assert.equal(res.validDraws.length, 2);
   assert.equal(res.manualLines.length, 1);
+  assert.equal(res.manualLines[0].fromCellId, '1-b0-ones');
+  assert.equal(res.manualLines[0].toCellId, '3-b0-ones');
   assert.equal(res.errors.length, 1);
 });
 
@@ -109,6 +112,7 @@ test('validateProject remains compatible with legacy files and sanitizes version
       selectedEvidenceDigit: 1,
       fullCandidates: [1, 11, 99],
       slipNumbers: [1, null, 23, null, 42],
+      systemSlipNumbers: [2, null, 27, null, 5],
       slipTensFilters: [0, null, 2, 8, 4],
       draftRows: [{ id: 'r1', numbers: [1, 2, 3, 4, 5], label: 'strong' }],
       sessions: []
@@ -119,8 +123,29 @@ test('validateProject remains compatible with legacy files and sanitizes version
   assert.deepEqual(versionTwo.workspace.activeFutureCell, { column: 2, digit: 5 });
   assert.deepEqual(versionTwo.workspace.fullCandidates, [1, 11]);
   assert.deepEqual(versionTwo.workspace.slipNumbers, [1, null, 23, null, 42]);
+  assert.deepEqual(versionTwo.workspace.systemSlipNumbers, [2, null, 27, null, 5]);
   assert.deepEqual(versionTwo.workspace.slipTensFilters, [0, null, 2, null, 4]);
   assert.equal(versionTwo.workspace.draftRows.length, 1);
+});
+
+test('validation removes the legacy digit-only leak from the extra line', () => {
+  const result = validateProject({
+    gameType: 'cash5',
+    draws: [{ id: '1', date: '2026-08-01', numbers: [1, 2, 3, 4, 5] }],
+    workspace: {
+      futureDigitMap: [
+        { column: 0, digit: 3 },
+        { column: 1, digit: 2 },
+        { column: 2, digit: 7 },
+        { column: 3, digit: 8 },
+        { column: 4, digit: 5 }
+      ],
+      slipNumbers: [3, 2, 7, 8, 5],
+      rowBuilder: [3, 2, 7, 8, 5]
+    }
+  });
+
+  assert.deepEqual(result.workspace.slipNumbers, [null, null, null, null, null]);
 });
 
 test('validateProject accepts version 3 documents and rejects retired game projects', () => {
@@ -152,6 +177,7 @@ test('validateProject preserves version 4 prediction sessions and manual Any ten
       { id: 'actual', date: '2026-08-02', numbers: [2, 13, 24, 35, 42] }
     ],
     workspace: {
+      nextDrawingPreviewHidden: true,
       slipTensFilters: [null, 1, 2, 3, 4],
       slipTensSources: ['manual', 'manual', 'automatic', 'empty', 'automatic'],
       predictionTracker: { version: 1, initializedAt: '2026-08-01T00:00:00Z', latestOfficialDrawDate: '2026-08-02' },
@@ -180,6 +206,7 @@ test('validateProject preserves version 4 prediction sessions and manual Any ten
     }
   });
   assert.equal(current.valid, true);
+  assert.equal(current.workspace.nextDrawingPreviewHidden, true);
   assert.deepEqual(current.workspace.slipTensSources, ['manual', 'manual', 'automatic', 'empty', 'automatic']);
   assert.equal(current.workspace.slipTensFilters[0], null);
   assert.equal(current.workspace.predictionTracker.version, 1);
@@ -187,4 +214,56 @@ test('validateProject preserves version 4 prediction sessions and manual Any ten
   assert.equal(current.workspace.sessions[0].rows[0].source, 'system');
   assert.equal(current.workspace.sessions[0].patternSignals[0].code, 'IM:+');
   assert.equal(current.workspace.sessions[0].result.patternSignalScores[0].hit, true);
+});
+
+test('validateProject restores v7 evidence policy and component probabilities while accepting legacy scores', () => {
+  const validated = validateProject({
+    appName: 'Cash 5 Studio',
+    version: 4,
+    draws: [{ id: 'base', date: '2026-08-28', numbers: [1, 12, 23, 34, 42] }],
+    workspace: {
+      sessions: [{
+        id: 'prediction-base',
+        kind: 'prediction',
+        trackingVersion: 6,
+        analyzerVersion: 7,
+        analyzerPolicy: {
+          kind: 'evidence', priorStrength: 10, comboWeight: 0.7, historyWeight: 0.2,
+          patternWeight: 0.05, stateWeight: 0.05, recencyHalfLife: 12,
+          evidenceId: 'v7-ending-consensus-2026-08-29'
+        },
+        status: 'pending',
+        baselineDate: '2026-08-28',
+        rows: [{
+          id: 'system-rank-1', source: 'system', rank: 1, available: true,
+          numbers: [1, 12, 23, 34, 42],
+          selectionScore: {
+            combined: 1.25, pattern: 0, stream: 0,
+            exactExpected: 1.25, endingExpected: 2.5, tensExpected: 3.1
+          },
+          candidateEvidence: [{
+            column: 0, number: 1, digit: 1,
+            comboProbability: 0.12, empiricalProbability: 0.1,
+            modelProbability: 0.12, endingProbability: 0.2, tensProbability: 0.3,
+            comboEndingProbability: 0.11, historyProbability: 0.18,
+            patternProbability: 0.21, stateProbability: 0.16,
+            combinedScore: 12, patternScore: 0
+          }]
+        }],
+        patternSignals: []
+      }]
+    }
+  });
+
+  const [session] = validated.workspace.sessions;
+  assert.deepEqual(session.analyzerPolicy, {
+    kind: 'evidence', priorStrength: 10, patternWeight: 0.05, stateWeight: 0.05,
+    comboWeight: 0.7, historyWeight: 0.2, recencyHalfLife: 12,
+    evidenceId: 'v7-ending-consensus-2026-08-29'
+  });
+  assert.equal(session.rows[0].selectionScore.exactExpected, 1.25);
+  assert.equal(session.rows[0].candidateEvidence[0].modelProbability, 0.12);
+  assert.equal(session.rows[0].candidateEvidence[0].tensProbability, 0.3);
+  assert.equal(session.rows[0].candidateEvidence[0].historyProbability, 0.18);
+  assert.equal(session.rows[0].candidateEvidence[0].stateProbability, 0.16);
 });

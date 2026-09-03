@@ -8,7 +8,7 @@ export function isConnectionTool(tool) {
 }
 
 export function shouldEndConnectionChain(targetRole, tool = "connect-line") {
-  return tool !== "freeform-line" && targetRole === "present";
+  return tool !== "freeform-line" && (targetRole === "present" || targetRole === "next");
 }
 
 export const LINE_COLOR_PALETTE = [
@@ -18,7 +18,11 @@ export const LINE_COLOR_PALETTE = [
   "#9b4f62"
 ];
 
-export const AUTO_PATTERN_ORDER = ['match', 'vertical', 'sister', 'math-diagonal-sequence', 'math-sister-output', 'math-l-pattern', 'math-sequence'];
+export const AUTO_PATTERN_ORDER = [
+  'match', 'twin-ending', 'consecutive-pair', 'vertical', 'skip-row-vertical',
+  'sister', 'knight', 'math-diagonal-sequence', 'math-sister-output',
+  'math-l-pattern', 'math-inverted-l', 'math-sequence'
+];
 const AUTO_RING_SPACING = 5;
 const AUTO_LINE_SPACING = 6;
 
@@ -27,8 +31,13 @@ export function automatedPatternType(line) {
   const id = String(line?.id || '');
   if (id.startsWith('auto-vrun-')) return 'vertical';
   if (id.startsWith('auto-diag-')) return 'sister';
+  if (id.startsWith('auto-knight-')) return 'knight';
+  if (id.startsWith('auto-skip-vertical-')) return 'skip-row-vertical';
+  if (id.startsWith('auto-twin-')) return 'twin-ending';
+  if (id.startsWith('auto-consecutive-')) return 'consecutive-pair';
   if (id.startsWith('auto-math-diag-')) return 'math-diagonal-sequence';
   if (id.startsWith('auto-math-sister-output-')) return 'math-sister-output';
+  if (id.startsWith('auto-math-inverted-l-')) return 'math-inverted-l';
   if (id.startsWith('auto-math-l-')) return 'math-l-pattern';
   if (id.startsWith('auto-math-')) return 'math-sequence';
   return 'match';
@@ -44,7 +53,7 @@ function patternSort(a, b) {
 
 function isBoxedMathematicalPattern(line) {
   const patternType = automatedPatternType(line);
-  return patternType === 'math-sequence' || patternType === 'math-l-pattern';
+  return patternType === 'math-sequence' || patternType === 'math-l-pattern' || patternType === 'math-inverted-l';
 }
 
 export function buildAutoRingLayout(lines = []) {
@@ -200,6 +209,43 @@ export function lPatternOutlinePoints(rects, outputSide, padding = 5) {
     { x: legRight, y: sourceBottom },
     { x: legRight, y: maxY },
     { x: minX, y: maxY }
+  ];
+}
+
+export function columnLOutlinePoints(rects, outputCorner, padding = 5) {
+  if (!Array.isArray(rects) || rects.length !== 3) return [];
+  const [stemTop, stemBottom, output] = rects;
+  const minX = Math.min(stemTop.left, stemBottom.left, output.left) - padding;
+  const minY = Math.min(stemTop.top, stemBottom.top, output.top) - padding;
+  const maxX = Math.max(stemTop.right, stemBottom.right, output.right) + padding;
+  const maxY = Math.max(stemTop.bottom, stemBottom.bottom, output.bottom) + padding;
+  const stemLeft = Math.min(stemTop.left, stemBottom.left) - padding;
+  const stemRight = Math.max(stemTop.right, stemBottom.right) + padding;
+  const [outputRow, outputSide] = String(outputCorner || 'lower-right').split('-');
+  const lowerInnerY = Math.min(stemBottom.top, output.top) - padding;
+  const upperInnerY = Math.max(stemTop.bottom, output.bottom) + padding;
+
+  if (outputRow === 'lower' && outputSide === 'right') {
+    return [
+      { x: minX, y: minY }, { x: stemRight, y: minY }, { x: stemRight, y: lowerInnerY },
+      { x: maxX, y: lowerInnerY }, { x: maxX, y: maxY }, { x: minX, y: maxY }
+    ];
+  }
+  if (outputRow === 'lower' && outputSide === 'left') {
+    return [
+      { x: stemLeft, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY },
+      { x: minX, y: maxY }, { x: minX, y: lowerInnerY }, { x: stemLeft, y: lowerInnerY }
+    ];
+  }
+  if (outputRow === 'upper' && outputSide === 'right') {
+    return [
+      { x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: upperInnerY },
+      { x: stemRight, y: upperInnerY }, { x: stemRight, y: maxY }, { x: minX, y: maxY }
+    ];
+  }
+  return [
+    { x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY },
+    { x: stemLeft, y: maxY }, { x: stemLeft, y: upperInnerY }, { x: minX, y: upperInnerY }
   ];
 }
 
@@ -460,12 +506,16 @@ export class ConnectionEngine {
         const maxY = Math.max(...rects.map(rect => rect.bottom)) + padding;
         const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
         group.dataset.lineId = sequence.id;
-        const isLPattern = automatedPatternType(sequence) === 'math-l-pattern';
+        const boxedType = automatedPatternType(sequence);
+        const isLPattern = boxedType === 'math-l-pattern' || boxedType === 'math-inverted-l';
         const outline = document.createElementNS(
           "http://www.w3.org/2000/svg",
           isLPattern ? "path" : "rect"
         );
-        if (isLPattern) {
+        if (boxedType === 'math-inverted-l') {
+          const points = columnLOutlinePoints(rects, sequence.sequenceDirection, padding);
+          outline.setAttribute("d", roundedPolygonPath(points, 10));
+        } else if (boxedType === 'math-l-pattern') {
           const points = lPatternOutlinePoints(rects, sequence.sequenceDirection, padding);
           outline.setAttribute("d", roundedPolygonPath(points, 10));
         } else {

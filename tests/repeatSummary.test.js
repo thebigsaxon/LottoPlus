@@ -11,8 +11,9 @@ test('heat summary classifies all ten digits from the rolling three-draw window'
   ];
   const summary = buildDigitRepeatSummary(draws);
   assert.deepEqual(summary.hot.map(item => item.digit), [3, 0]);
-  assert.deepEqual(summary.neutral.map(item => item.digit), [1, 2, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(summary.neutral.map(item => item.digit), [1, 2, 4, 5, 6, 7, 8]);
   assert.deepEqual(summary.cold.map(item => item.digit), []);
+  assert.deepEqual(summary.emerging.map(item => item.digit), [9]);
   assert.equal(summary.items.length, 10);
   assert.deepEqual(summary.repeatingDigits, [3, 0]);
   assert.equal(summary.repeatingCount, 2);
@@ -41,8 +42,13 @@ test('latest example produces the requested HNCDE groups', () => {
 
   assert.deepEqual(summary.hot.map(item => item.digit), [1, 6]);
   assert.deepEqual(summary.cold.map(item => item.digit), [7, 8]);
+  assert.deepEqual(summary.neutral.map(item => item.digit), [2, 3, 0]);
   assert.deepEqual(summary.decliningDigits, [4, 9]);
   assert.deepEqual(summary.emergingDigits, [5]);
+  const groups = [summary.hot, summary.cold, summary.neutral, summary.declining, summary.emerging];
+  const assignedDigits = groups.flat().map(item => item.digit);
+  assert.equal(assignedDigits.length, 10);
+  assert.equal(new Set(assignedDigits).size, 10);
 });
 
 test('timeline marks cold-to-drawn digits emerging and former hot digits declining', async () => {
@@ -54,7 +60,16 @@ test('timeline marks cold-to-drawn digits emerging and former hot digits declini
     { id: 'd', date: '2026-01-04', numbers: [1, 22, 23, 24, 30] },
     { id: 'e', date: '2026-01-05', numbers: [5, 26, 27, 28, 39] }
   ];
-  const latest = buildDigitHeatTimeline(draws).at(-1);
+  const timeline = buildDigitHeatTimeline(draws);
+  timeline.forEach(entry => {
+    const assigned = [entry.hot, entry.cold, entry.neutral, entry.declining, entry.emerging]
+      .flat()
+      .map(item => item.digit);
+    assert.equal(assigned.length, 10);
+    assert.equal(new Set(assigned).size, 10);
+  });
+  const latest = timeline.at(-1);
   assert.deepEqual(latest.emergingDigits, [5, 6, 7, 8, 9]);
   assert.deepEqual(latest.decliningDigits, [1, 2, 3, 4, 0]);
+  assert.deepEqual(latest.neutral, []);
 });

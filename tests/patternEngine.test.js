@@ -12,8 +12,7 @@ test('patternEngine detects vertical runs strictly in the same column', () => {
     showMatches: false,
     showVerticalRuns: true,
     showDiagonalRuns: false,
-    showTens: true,
-    showOnes: true
+    showCompleteNumbers: false
   });
 
   assert.ok(lines.length > 0);
@@ -30,8 +29,7 @@ test('patternEngine detects diagonal runs strictly for 1:1 diagonal column shift
     showMatches: false,
     showVerticalRuns: false,
     showDiagonalRuns: true,
-    showTens: true,
-    showOnes: true
+    showCompleteNumbers: false
   });
 
   assert.ok(lines.every(line => line.style === 'dashed'));
@@ -47,8 +45,7 @@ test('patternEngine keeps one connection per scenario for identical cell pairs',
     showMatches: true,
     showVerticalRuns: true,
     showDiagonalRuns: true,
-    showTens: true,
-    showOnes: true
+    showCompleteNumbers: false
   });
 
   const scenarioPairKeys = lines.map(l => `${l.patternType}:${[l.fromCellId, l.toCellId].sort().join(':')}`);
@@ -74,8 +71,7 @@ test('nearby digit matches only connect adjacent rows with one-to-one cell pairi
     showMatches: true,
     showVerticalRuns: false,
     showDiagonalRuns: false,
-    showTens: true,
-    showOnes: true
+    showCompleteNumbers: false
   });
 
   assert.ok(lines.every(line => {
@@ -96,6 +92,53 @@ test('nearby digit matches only connect adjacent rows with one-to-one cell pairi
   });
 });
 
+test('complete-number matches reject equal endings and accept only equal whole values', () => {
+  const endingOnlyDraws = [
+    { id: 'd1', date: '2026-08-01', numbers: [12, 13, 14, 15, 16] },
+    { id: 'd2', date: '2026-08-02', numbers: [22, 23, 24, 25, 26] }
+  ];
+  const digitMatches = generateAutomatedPatterns(endingOnlyDraws, {
+    showMatches: true,
+    showCompleteNumbers: false
+  }).filter(line => line.patternType === 'match');
+  const completeMatches = generateAutomatedPatterns(endingOnlyDraws, {
+    showMatches: true,
+    showCompleteNumbers: true
+  }).filter(line => line.patternType === 'match');
+
+  assert.equal(digitMatches.length, 5);
+  assert.equal(completeMatches.length, 0);
+
+  const exactMatches = generateAutomatedPatterns([
+    endingOnlyDraws[0],
+    { id: 'd3', date: '2026-08-03', numbers: [12, 23, 24, 25, 26] }
+  ], {
+    showMatches: true,
+    showCompleteNumbers: true
+  }).filter(line => line.patternType === 'match');
+  assert.equal(exactMatches.length, 1);
+  assert.equal(exactMatches[0].fromCellId, 'd1-b0-ones');
+  assert.equal(exactMatches[0].toCellId, 'd3-b0-ones');
+  assert.equal(exactMatches[0].label, 'Number 12');
+});
+
+test('complete-number movement patterns use Ball positions rather than split digit columns', () => {
+  const lines = generateAutomatedPatterns([
+    { id: 'd1', date: '2026-08-01', numbers: [12, 20, 30, 40, 42] },
+    { id: 'd2', date: '2026-08-02', numbers: [5, 12, 25, 35, 41] }
+  ], {
+    showMatches: false,
+    showDiagonalRuns: true,
+    showCompleteNumbers: true
+  });
+
+  const sister = lines.find(line => line.patternType === 'sister');
+  assert.ok(sister);
+  assert.equal(sister.fromCellId, 'd1-b0-ones');
+  assert.equal(sister.toCellId, 'd2-b1-ones');
+  assert.equal(sister.label, 'Sister Shift: 12');
+});
+
 test('mathematical sequences connect matching three-row columns', () => {
   const draws = [
     { id: 'd1', date: '2026-08-17', numbers: [3, 7, 2, 4, 6], bonus: null },
@@ -108,8 +151,7 @@ test('mathematical sequences connect matching three-row columns', () => {
     showVerticalRuns: false,
     showDiagonalRuns: false,
     showMathematicalSequences: true,
-    showTens: false,
-    showOnes: true
+    showCompleteNumbers: false
   });
 
   const mathLines = lines.filter(line => line.patternType === 'math-sequence');
@@ -117,6 +159,47 @@ test('mathematical sequences connect matching three-row columns', () => {
   assert.ok(mathLines.some(line => line.sequenceCellIds.join(',') === 'd1-b1-ones,d2-b1-ones,d3-b1-ones'));
   assert.ok(mathLines.some(line => line.label.includes('11 − 3 = 8')));
   assert.ok(mathLines.some(line => line.label.includes('8 − 7 = 1')));
+});
+
+test('complete-number mathematical sequences use literal in-range addition and subtraction', () => {
+  const lines = generateAutomatedPatterns([
+    { id: 'd1', date: '2026-08-01', numbers: [12, 35] },
+    { id: 'd2', date: '2026-08-02', numbers: [20, 12] },
+    { id: 'd3', date: '2026-08-03', numbers: [32, 23] }
+  ], {
+    showMatches: false,
+    showMathematicalSequences: true,
+    showCompleteNumbers: true
+  }).filter(line => line.patternType === 'math-sequence');
+
+  assert.ok(lines.some(line => line.sequenceCellIds.join(',') === 'd1-b0-ones,d2-b0-ones,d3-b0-ones'
+    && line.label.includes('12 + 20 = 32')));
+  assert.ok(lines.some(line => line.sequenceCellIds.join(',') === 'd1-b1-ones,d2-b1-ones,d3-b1-ones'
+    && line.label.includes('35 − 12 = 23')));
+});
+
+test('complete-number mathematics does not wrap out-of-range sums or use borrowed-digit results', () => {
+  const wrapped = generateAutomatedPatterns([
+    { id: 'd1', date: '2026-08-01', numbers: [30] },
+    { id: 'd2', date: '2026-08-02', numbers: [20] },
+    { id: 'd3', date: '2026-08-03', numbers: [8] }
+  ], {
+    showMatches: false,
+    showMathematicalSequences: true,
+    showCompleteNumbers: true
+  });
+  const borrowed = generateAutomatedPatterns([
+    { id: 'd1', date: '2026-08-01', numbers: [7] },
+    { id: 'd2', date: '2026-08-02', numbers: [8] },
+    { id: 'd3', date: '2026-08-03', numbers: [9] }
+  ], {
+    showMatches: false,
+    showMathematicalSequences: true,
+    showCompleteNumbers: true
+  });
+
+  assert.equal(wrapped.filter(line => line.patternType === 'math-sequence').length, 0);
+  assert.equal(borrowed.filter(line => line.patternType === 'math-sequence').length, 0);
 });
 
 test('overlapping mathematical sequence chains use dashed group rectangles', () => {
@@ -129,8 +212,7 @@ test('overlapping mathematical sequence chains use dashed group rectangles', () 
   const lines = generateAutomatedPatterns(draws, {
     showMatches: false,
     showMathematicalSequences: true,
-    showTens: false,
-    showOnes: true
+    showCompleteNumbers: false
   });
   const mathLines = lines.filter(line => line.patternType === 'math-sequence');
   assert.equal(mathLines.length, 2);
@@ -148,8 +230,7 @@ test('diagonal mathematical sequences move one column consistently across three 
     showMatches: false,
     showMathematicalSequences: false,
     showDiagonalMathematicalSequences: true,
-    showTens: false,
-    showOnes: true
+    showCompleteNumbers: false
   });
 
   const diagonalLines = lines.filter(line => line.patternType === 'math-diagonal-sequence');
@@ -174,8 +255,7 @@ test('diagonal mathematical sequences remain off unless their overlay is enabled
     showMatches: false,
     showMathematicalSequences: true,
     showDiagonalMathematicalSequences: false,
-    showTens: false,
-    showOnes: true
+    showCompleteNumbers: false
   });
 
   assert.ok(lines.every(line => line.patternType !== 'math-diagonal-sequence'));
@@ -190,8 +270,7 @@ test('sister-output sequences use two inline sources and a left or right output'
   const lines = generateAutomatedPatterns(draws, {
     showMatches: false,
     showSisterOutputSequences: true,
-    showTens: false,
-    showOnes: true
+    showCompleteNumbers: false
   });
   const sisterOutputs = lines.filter(line => line.patternType === 'math-sister-output');
 
@@ -205,6 +284,84 @@ test('sister-output sequences use two inline sources and a left or right output'
     && line.hideNodeRings === true));
 });
 
+test('knight shifts connect the same digit two visible columns apart', () => {
+  const lines = generateAutomatedPatterns([
+    { id: 'd1', date: '2026-08-25', numbers: [2, 4, 13, 20, 39] },
+    { id: 'd2', date: '2026-08-26', numbers: [14, 16, 19, 31, 41] }
+  ], {
+    showMatches: false,
+    showKnightShifts: true,
+    showCompleteNumbers: false
+  });
+  const knights = lines.filter(line => line.patternType === 'knight');
+  assert.ok(knights.some(line => line.fromCellId === 'd1-b4-ones' && line.toCellId === 'd2-b2-ones'));
+  assert.ok(knights.every(line => line.style === 'dashed'));
+});
+
+test('skip-row column runs ignore an intervening different digit', () => {
+  const lines = generateAutomatedPatterns([
+    { id: 'd1', date: '2026-08-18', numbers: [1, 8, 12, 33, 38] },
+    { id: 'd2', date: '2026-08-19', numbers: [8, 11, 28, 32, 34] },
+    { id: 'd3', date: '2026-08-20', numbers: [1, 3, 12, 23, 37] }
+  ], {
+    showMatches: false,
+    showVerticalRuns: false,
+    showSkipRowVerticals: true,
+    showCompleteNumbers: false
+  });
+  const skips = lines.filter(line => line.patternType === 'skip-row-vertical');
+  assert.ok(skips.some(line => line.fromCellId === 'd1-b0-ones' && line.toCellId === 'd3-b0-ones'));
+  assert.ok(skips.some(line => line.fromCellId === 'd1-b2-ones' && line.toCellId === 'd3-b2-ones'));
+  assert.equal(skips.filter(line => line.fromCellId === 'd1-b0-ones' && line.toCellId === 'd2-b0-ones').length, 0);
+});
+
+test('twin endings connect shared ones digits inside one draw', () => {
+  [false, true].forEach(showCompleteNumbers => {
+    const lines = generateAutomatedPatterns([
+      { id: 'd1', date: '2026-08-28', numbers: [15, 25, 28, 30, 38] }
+    ], {
+      showMatches: false,
+      showTwinEndings: true,
+      showCompleteNumbers
+    });
+    const twins = lines.filter(line => line.patternType === 'twin-ending');
+    assert.ok(twins.some(line => line.fromCellId === 'd1-b0-ones' && line.toCellId === 'd1-b1-ones' && line.label.includes('15') && line.label.includes('25')));
+    assert.ok(twins.some(line => line.fromCellId === 'd1-b2-ones' && line.toCellId === 'd1-b4-ones'));
+  });
+});
+
+test('consecutive pairs mark n and n+1 in the same draw', () => {
+  [false, true].forEach(showCompleteNumbers => {
+    const lines = generateAutomatedPatterns([
+      { id: 'd1', date: '2026-08-21', numbers: [3, 22, 23, 24, 35] }
+    ], {
+      showMatches: false,
+      showConsecutivePairs: true,
+      showCompleteNumbers
+    });
+    const pairs = lines.filter(line => line.patternType === 'consecutive-pair');
+    assert.ok(pairs.some(line => line.label.includes('22–23')));
+    assert.ok(pairs.some(line => line.label.includes('23–24')));
+  });
+});
+
+test('inverted L uses stacked column sources and a sister output', () => {
+  const lines = generateAutomatedPatterns([
+    { id: 'd1', date: '2026-08-23', numbers: [1, 13, 17, 40, 41] },
+    { id: 'd2', date: '2026-08-24', numbers: [16, 17, 28, 33, 40] }
+  ], {
+    showMatches: false,
+    showLPatterns: false,
+    showInvertedLPatterns: true,
+    showCompleteNumbers: false
+  });
+  const inverted = lines.filter(line => line.patternType === 'math-inverted-l');
+  const example = inverted.find(line => line.sequenceCellIds.join(',') === 'd1-b0-ones,d2-b0-ones,d2-b1-ones');
+  assert.ok(example);
+  assert.equal(example.sequenceDirection, 'lower-right');
+  assert.ok(example.label.includes('1 + 6 = 7'));
+});
+
 test('L patterns use adjacent same-draw sources and output below either endpoint', () => {
   const draws = [
     { id: 'd1', date: '2026-08-17', numbers: [1, 2, 3], bonus: null },
@@ -214,8 +371,7 @@ test('L patterns use adjacent same-draw sources and output below either endpoint
   const lines = generateAutomatedPatterns(draws, {
     showMatches: false,
     showLPatterns: true,
-    showTens: false,
-    showOnes: true
+    showCompleteNumbers: false
   });
   const lPatterns = lines.filter(line => line.patternType === 'math-l-pattern');
   const example = lPatterns.find(line => line.sequenceCellIds.join(',') === 'd2-b0-ones,d2-b1-ones,d3-b0-ones');
@@ -225,13 +381,36 @@ test('L patterns use adjacent same-draw sources and output below either endpoint
   assert.ok(example.label.includes('2 + 2 = 4'));
 });
 
+test('patterns can land on a partial Next drawing preview row', () => {
+  const draws = [
+    { id: 'd1', date: '2026-08-23', numbers: [1, 13, 17, 40, 41] },
+    { id: 'preview-next-drawing', date: '2026-08-03', numbers: [16, 17, null, null, null] }
+  ];
+  const lines = generateAutomatedPatterns(draws, {
+    showMatches: false,
+    showInvertedLPatterns: true,
+    showCompleteNumbers: false
+  });
+  const inverted = lines.filter(line => line.patternType === 'math-inverted-l');
+  assert.ok(inverted.some(line => line.toCellId === 'preview-next-drawing-b1-ones'));
+
+  const completeLines = generateAutomatedPatterns(draws, {
+    showMatches: false,
+    showInvertedLPatterns: true,
+    showCompleteNumbers: true
+  });
+  assert.ok(completeLines.some(line => line.patternType === 'math-inverted-l'
+    && line.toCellId === 'preview-next-drawing-b1-ones'
+    && line.label.includes('1 + 16 = 17')));
+});
+
 test('Winning Patterns includes every established pattern ending on selected rows only', () => {
   const draws = [
     { id: 'd1', date: '2026-08-17', numbers: [1, 2, 3, 4, 5], bonus: null },
     { id: 'd2', date: '2026-08-18', numbers: [2, 2, 5, 4, 6], bonus: null },
     { id: 'd3', date: '2026-08-19', numbers: [4, 8, 0, 4, 7], bonus: null }
   ];
-  const visibleSettings = { showTens: false, showOnes: true, showMatches: false };
+  const visibleSettings = { showCompleteNumbers: false, showMatches: false };
   const allPatterns = generateAutomatedPatterns(draws, {
     ...visibleSettings,
     showMatches: true,
@@ -240,7 +419,12 @@ test('Winning Patterns includes every established pattern ending on selected row
     showMathematicalSequences: true,
     showDiagonalMathematicalSequences: true,
     showSisterOutputSequences: true,
-    showLPatterns: true
+    showLPatterns: true,
+    showInvertedLPatterns: true,
+    showKnightShifts: true,
+    showSkipRowVerticals: true,
+    showTwinEndings: true,
+    showConsecutivePairs: true
   });
   const expectedIds = allPatterns
     .filter(line => line.toCellId.startsWith('d3-'))
@@ -262,4 +446,23 @@ test('Winning Patterns includes every established pattern ending on selected row
     showWinningPatterns: true,
     winningPatternDrawIds: []
   }).length, 0);
+});
+
+test('Winning Patterns inherits complete-number semantics', () => {
+  const lines = generateAutomatedPatterns([
+    { id: 'd1', date: '2026-08-01', numbers: [11, 12, 13, 14, 15] },
+    { id: 'd2', date: '2026-08-02', numbers: [11, 22, 23, 24, 25] }
+  ], {
+    showMatches: false,
+    showWinningPatterns: true,
+    winningPatternDrawIds: ['d2'],
+    showCompleteNumbers: true
+  });
+  const matches = lines.filter(line => line.patternType === 'match');
+
+  assert.ok(matches.some(line => line.fromCellId === 'd1-b0-ones'
+    && line.toCellId === 'd2-b0-ones'
+    && line.label === 'Number 11'));
+  assert.ok(matches.every(line => !(line.fromCellId === 'd1-b1-ones' && line.toCellId === 'd2-b1-ones')));
+  assert.ok(matches.every(line => line.isWinningPattern && line.winningOutputDrawId === 'd2'));
 });

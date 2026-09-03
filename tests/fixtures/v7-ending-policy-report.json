@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-31T01:38:54.015Z",
+  "archiveChecksum": "ef0377d8798287532a1d3f988914add823f5fd9c4b15f634dec00a2a8c877004",
+  "objective": "Calibrated ending probabilities by Ball position; lower Brier score and log loss are better.",
+  "selectionConstraint": "All four requested evidence sources remain active; combo and history are at least 20%, pattern and HNCDE are at least 5%.",
+  "splitDates": {
+    "train": [
+      "2024-04-22",
+      "2025-09-19"
+    ],
+    "validation": [
+      "2025-09-20",
+      "2026-03-10"
+    ],
+    "test": [
+      "2026-03-11",
+      "2026-08-29"
+    ]
+  },
+  "selectedWeights": {
+    "combo": 0.7,
+    "history": 0.2,
+    "pattern": 0.05,
+    "hncde": 0.05
+  },
+  "train": {
+    "evidence": {
+      "cells": 2580,
+      "brier": 0.8960235363670473,
+      "logLoss": 2.282345161841562,
+      "topThreeRate": 0.362015503875969
+    },
+    "combo": {
+      "cells": 2580,
+      "brier": 0.8954227320441656,
+      "logLoss": 2.2793486197702553,
+      "topThreeRate": 0.3689922480620155
+    }
+  },
+  "validation": {
+    "evidence": {
+      "cells": 860,
+      "brier": 0.8970854347610611,
+      "logLoss": 2.2886140601024647,
+      "topThreeRate": 0.3453488372093023
+    },
+    "combo": {
+      "cells": 860,
+      "brier": 0.8964166850681574,
+      "logLoss": 2.285159789056116,
+      "topThreeRate": 0.35
+    }
+  },
+  "test": {
+    "evidence": {
+      "cells": 860,
+      "brier": 0.8951685680760937,
+      "logLoss": 2.2780516706461356,
+      "topThreeRate": 0.3744186046511628
+    },
+    "combo": {
+      "cells": 860,
+      "brier": 0.8952871814802236,
+      "logLoss": 2.2782474861104323,
+      "topThreeRate": 0.3686046511627907
+    }
+  },
+  "improvementClaimAllowed": false,
+  "unconstrainedRecency": {
+    "selectedWeights": {
+      "combo": 0.95,
+      "history": 0.05,
+      "pattern": 0,
+      "hncde": 0
+    },
+    "recencyVoteAllowed": false,
+    "train": {
+      "cells": 2580,
+      "brier": 0.8954113578464284,
+      "logLoss": 2.2792859732419504,
+      "topThreeRate": 0.3697674418604651
+    },
+    "validation": {
+      "cells": 860,
+      "brier": 0.8964270054337714,
+      "logLoss": 2.2852712072953736,
+      "topThreeRate": 0.3546511627906977
+    },
+    "test": {
+      "cells": 860,
+      "brier": 0.895114443541399,
+      "logLoss": 2.277452778740915,
+      "topThreeRate": 0.3732558139534884
+    },
+    "combo": {
+      "validation": {
+        "cells": 860,
+        "brier": 0.8964166850681574,
+        "logLoss": 2.285159789056116,
+        "topThreeRate": 0.35
+      },
+      "test": {
+        "cells": 860,
+        "brier": 0.8952871814802236,
+        "logLoss": 2.2782474861104323,
+        "topThreeRate": 0.3686046511627907
+      }
+    }
+  }
+}

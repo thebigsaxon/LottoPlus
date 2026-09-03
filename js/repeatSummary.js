@@ -3,7 +3,9 @@ import { drawToOnes } from './onesAnalysis.js';
 export const DIGIT_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
 
 function digitSet(draw) {
-  return new Set(drawToOnes(draw).map(cell => cell.digit));
+  return new Set(drawToOnes(draw)
+    .map(cell => cell.digit)
+    .filter(digit => Number.isInteger(digit) && digit >= 0 && digit <= 9));
 }
 
 function orderedDigits(values) {
@@ -47,7 +49,7 @@ export function classifyDigitHeatAt(draws = [], endIndex = draws.length - 1) {
 export function buildDigitHeatTimeline(draws = []) {
   const safeDraws = chronological(draws);
   return safeDraws.map((draw, index) => {
-    const classification = classifyDigitHeatAt(safeDraws, index);
+    const baseClassification = classifyDigitHeatAt(safeDraws, index);
     const previous = index > 0 ? classifyDigitHeatAt(safeDraws, index - 1) : null;
     const currentDigits = digitSet(draw);
     const previousCold = new Set(previous?.cold.map(item => item.digit) || []);
@@ -60,14 +62,28 @@ export function buildDigitHeatTimeline(draws = []) {
     const priorDigits = index > 0 ? digitSet(safeDraws[index - 1]) : new Set();
     const repeatingDigits = orderedDigits([...currentDigits].filter(digit => priorDigits.has(digit)));
 
-    const byDigit = new Map(classification.items.map(item => [item.digit, item]));
+    // H, N, C, D, and E are mutually exclusive display states. Movement
+    // states replace the base Neutral assignment instead of overlaying it.
+    const emergingSet = new Set(emergingDigits);
+    const decliningSet = new Set(decliningDigits);
+    const items = baseClassification.items.map(item => ({
+      ...item,
+      tier: emergingSet.has(item.digit)
+        ? 'emerging'
+        : decliningSet.has(item.digit)
+          ? 'declining'
+          : item.tier
+    }));
     return {
       draw,
-      ...classification,
+      hot: items.filter(item => item.tier === 'hot'),
+      neutral: items.filter(item => item.tier === 'neutral'),
+      cold: items.filter(item => item.tier === 'cold'),
       emergingDigits,
       decliningDigits,
-      emerging: emergingDigits.map(digit => byDigit.get(digit)),
-      declining: decliningDigits.map(digit => byDigit.get(digit)),
+      emerging: items.filter(item => item.tier === 'emerging'),
+      declining: items.filter(item => item.tier === 'declining'),
+      items,
       repeatingDigits,
       repeatingCount: repeatingDigits.length
     };

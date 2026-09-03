@@ -1,25 +1,25 @@
 # Cash 5 Studio
 
-Cash 5 Studio is a focused macOS workspace for exploring recent **SC Palmetto Cash 5** drawings. It combines a ten-draw ones-digit matrix, explainable historical relationships, a next-draw position board, fuzzy tens-range guidance, visually ranked number evidence, ticket-row composition, and timestamped outcome review.
+Cash 5 Studio is a focused macOS workspace for exploring recent **SC Palmetto Cash 5** drawings. It combines a ten-draw ending matrix with an optional complete-number mode, explainable historical relationships, a next-draw position board, fuzzy tens-range guidance, visually ranked number evidence, ticket-row composition, and timestamped outcome review.
 
-The toolbar includes persistent low-glare Light and Dark themes. **Update Draws** refreshes both the latest 50 historical drawings and the current estimated jackpot from the official South Carolina Education Lottery; either result can update independently if one source is temporarily unavailable.
+The toolbar includes persistent low-glare Light and Dark themes. **Update Draws** refreshes the latest historical drawings from LotteryUSA and the current estimated jackpot from the official South Carolina Education Lottery; either result can update independently if one source is temporarily unavailable.
 
 > Cash 5 Studio describes historical data; it does not predict lottery results. Drawings are independent random events, and visual patterns carry no predictive guarantee.
 
 ## Workflow
 
 1. Review the latest ten drawings and optional relationship overlays in **Draw History**.
-2. Review the **Next Draw Board**, where each row is a complete increasing five-number recommendation. Model version 5 ranks endings from 70% Ball-position frequency, 20% calibrated positive pattern lift, and 10% H/N/C/D/E transition evidence across up to 50 draws. Full numbers blend 80% position frequency, 10% recency, and 10% four-draw proximity; previously drawn numbers remain eligible. The three recommendations form a 15-number coverage portfolio with no full number reused between lines and three different endings in every Ball column. Whole-line assembly also allows no more than two numbers sharing an ending, preventing rare three-number mathematical lines from appearing as ordinary recommendations. Open **Show all digits** for the historical-successor view, then toggle one digit per position for your own selection. Each mapped digit highlights all of its occurrences in Draw History; mapping the same digit twice adds concentric Ball-color rings.
+2. Review the **Next Draw Board**, where analyzer version 9 shows three neutral system lines (A–C) selected by the Blue uniform control. Red temporal evidence, Green structure evidence (including prospective pivot-derived full numbers), and Yellow H/N/C/D/E sequence evidence remain audited study tracks until a checked-in held-out report clears every promotion gate. The 15 control numbers are unique and partitioned into three valid, sorted lines; ending-multiplicity and Ball-column ending-diversity restrictions are not imposed. Open **Show all digits** for the historical-successor view, then toggle one digit per position for highlighting.
 3. Use **Study Similar Sequences** or **Inspect Number Evidence** across the latest 50 loaded drawings for context, then place useful full numbers directly into their corresponding slip positions.
-4. Build and save one or more five-number rows from the position-aware menus. Available tens bands are filled automatically and refresh with official history or mapped-ending changes, while every manual tens choice remains locked.
-5. Save the rows for the next drawing. Saved Sessions keeps them beside up to three valid increasing system lines and immutable ending-evidence and number-history snapshots. Previously drawn numbers remain eligible and are evaluated by position frequency, recency, and four-draw proximity. Scored older-model sessions remain unchanged, while pending and future system selections use model version 5.
-6. After an official result arrives, review exact-number, ending-digit, tens-band, and per-Ball right/wrong diagnostics. The shorthand pattern scorecard reports every signal hit and miss by family and arithmetic operation.
+4. Optionally build an extra user line in **Your pick**, directly under the Next Draw Board. Those numbers appear as a **Next drawing** row under Latest in Draw History, so pattern overlays and Winning Patterns can land on the pick. The three system lines are already saved with the session; this picker is only for additional rows. Available tens bands fill automatically and refresh with official history or mapped-ending changes, while every manual tens choice remains locked.
+5. Save the rows for the next drawing. Saved Sessions keeps them beside the three system lines and immutable track, pivot, policy, archive, and evaluation snapshots. After a result, the ledger scores the primary unordered match tier plus exact-position, ending, tens, pattern, pivot, and HNCDE diagnostics. Scored older-model sessions remain unchanged, while pending and future system selections use analyzer version 9.
+6. After an official result arrives, review unordered number hits, exact-position hits, ending-digit hits, tens-band hits, and per-Ball diagnostics separately. The shorthand pattern scorecard reports every signal hit and miss by family and arithmetic operation.
 
-Pattern overlays support adjacent matches, same-column runs, one-column sister shifts, and mathematical sequences running vertically, diagonally, into an uncluttered three-draw sister-output path, or in an L shape. Manual line and arrow annotations are available from the contextual **Annotate** toolbar.
+Pattern overlays support adjacent matches, same-column runs, one-column sister shifts, knight shifts (skip one Ball), skip-row column runs, twin endings, consecutive n/n+1 pairs, and mathematical sequences running vertically, diagonally, into an uncluttered three-draw sister-output path, in an L, or in an inverted L. Enable **Show complete number** to compare whole values instead of independent digits; mathematical overlays then use literal in-range addition and absolute subtraction. Manual line and arrow annotations are available from the contextual **Annotate** toolbar.
 
 Enable **Winning Patterns** to add a selector beside each history row. Checking a row displays every established pattern whose exact output lands in that draw and Ball position; multiple rows can be selected together.
 
-Each per-Ball recommendation includes position-frequency, calibrated-pattern, H/N/C/D/E state, and full-number-history evidence plus leakage-free ending and exact-number walk-forward results in the inspector. These are measurements of historical agreement, not probabilities for a random future drawing.
+Each track shows its top endings and audit status. The Green inspector expands low-, high-, or combined-pivot endings derived solely from the preceding draw into legal full-number candidates for each Ball position, then reports supporting temporal, pattern, and HNCDE evidence. Retrospective Winning Pivot Point analysis remains display-only and never enters prospective picks. The checked v9 held-out report currently authorizes only the Blue control. These diagnostics do not change the jackpot probability of any valid five-number line.
 
 ## Development
 
@@ -29,6 +29,15 @@ Run tests with an available Node.js runtime:
 
 ```bash
 npm test
+```
+
+Rebuild and audit the checked-in policies with:
+
+```bash
+npm run build:archive
+npm run evaluate:v6
+npm run evaluate:v7
+npm run evaluate:v9
 ```
 
 Build the native application with Xcode command-line tools:

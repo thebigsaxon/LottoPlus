@@ -9,6 +9,7 @@ APP_NAME="Cash 5 Studio.app"
 BUILD_DIR=".build/release"
 OUTPUT_DIR="dist"
 
+rm -rf "$OUTPUT_DIR/$APP_NAME"
 mkdir -p "$OUTPUT_DIR/$APP_NAME/Contents/MacOS"
 mkdir -p "$OUTPUT_DIR/$APP_NAME/Contents/Resources"
 
@@ -48,6 +49,7 @@ EOF
 
 # Touch app bundle to force macOS Finder & Dock icon cache update
 touch "$OUTPUT_DIR/$APP_NAME"
+codesign --force --deep --sign - "$OUTPUT_DIR/$APP_NAME"
 
 echo "Packaged $OUTPUT_DIR/$APP_NAME"
 
@@ -60,5 +62,6 @@ if [ -d "$LEGACY_APP/Contents/Resources" ]; then
     cp -R css "$LEGACY_APP/Contents/Resources/"
     cp -R js "$LEGACY_APP/Contents/Resources/"
     touch "$LEGACY_APP"
+    codesign --force --deep --sign - "$LEGACY_APP"
     echo "Updated legacy launcher $LEGACY_APP"
 fi

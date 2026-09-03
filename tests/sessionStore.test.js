@@ -103,8 +103,8 @@ test('prediction ledger backfills ten scored dates and leaves one pending withou
   assert.equal(sessions.filter(session => !session.result).length, 1);
   assert.equal(sessions[0].baselineDate, '2026-08-04');
   assert.equal(sessions[0].status, 'pending');
-  assert.equal(initialized.workspace.predictionTracker.version, 4);
-  assert.ok(sessions.every(session => session.analyzerVersion === 5));
+  assert.equal(initialized.workspace.predictionTracker.version, 8);
+  assert.ok(sessions.every(session => session.analyzerVersion === 10));
 
   const chronological = [...SAMPLE_CASH_5].sort((a, b) => a.date.localeCompare(b.date));
   const historical = sessions.find(session => session.baselineDate === '2026-07-25');
@@ -120,33 +120,34 @@ test('prediction ledger backfills ten scored dates and leaves one pending withou
   assert.equal(secondPass.workspace.sessions.length, 11);
 });
 
-test('system rows use deterministic optimized lines and expose sparse history as unavailable', () => {
+test('v10 system rows are composed from the ending pool with reasons', () => {
   const first = createPredictionSession(SAMPLE_CASH_5);
   const second = createPredictionSession([...SAMPLE_CASH_5].reverse());
   assert.deepEqual(first.rows, second.rows);
-  first.rows.filter(row => row.available).forEach(row => {
-    assert.equal(row.analyzerVersion, 5);
+  assert.ok(first.endingPool.length >= 3);
+  assert.deepEqual(first.rows.map(row => row.role), ['core', 'spread', 'guard']);
+  const available = first.rows.filter(row => row.available);
+  assert.ok(available.length >= 1);
+  available.forEach(row => {
+    assert.equal(row.analyzerVersion, 10);
     assert.equal(row.numbers.length, 5);
     assert.equal(new Set(row.numbers).size, 5);
     assert.ok(row.numbers.every((number, index) => index === 0 || number > row.numbers[index - 1]));
-    assert.deepEqual(row.numbers.map(number => number % 10), row.digits);
-    assert.deepEqual(row.numbers.map(number => Math.floor(number / 10)), row.tensBands);
-    const endingCounts = row.digits.reduce((counts, digit) => counts.set(digit, (counts.get(digit) || 0) + 1), new Map());
-    assert.ok(Math.max(...endingCounts.values()) <= 2);
+    assert.ok(row.numbers.every(number => first.endingPool.includes(number % 10)));
+    assert.equal(row.reasons.length, 5);
+    assert.ok(row.reasons.every(reason => /ending/.test(reason) && !/%/.test(reason)));
+    assert.ok(row.candidateEvidence.every(item => item.reason && item.role === row.role));
   });
-  assert.equal(new Set(first.rows.filter(row => row.available).flatMap(row => row.numbers)).size, 15);
-  for (let column = 0; column < 5; column += 1) {
-    assert.equal(new Set(first.rows.filter(row => row.available).map(row => row.digits[column])).size, 3);
-  }
+  const used = available.flatMap(row => row.numbers);
+  assert.equal(new Set(used).size, used.length);
 
   const sparse = createPredictionSession([
     { id: 'same-digits', date: '2026-08-01', numbers: [1, 11, 21, 31, 41] }
   ]);
-  assert.equal(sparse.rows[2].available, false);
-  assert.match(sparse.rows[2].unavailableReason, /requires.*history/i);
+  assert.ok(sparse.rows.every(row => row.available === false));
 });
 
-test('model-v5 migration preserves scored sessions and user rows while rebuilding pending system lines', () => {
+test('model-v9 migration preserves scored sessions and user rows while rebuilding pending system lines', () => {
   const latest = [...SAMPLE_CASH_5].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
   const userRow = createDraftRow([1, 5, 12, 23, 42], 'strong', 'preserve me');
   const scoredV1 = {
@@ -167,13 +168,22 @@ test('model-v5 migration preserves scored sessions and user rows while rebuildin
     predictionTracker: { version: 3, initializedAt: '2026-08-01T00:00:00.000Z' }
   };
   const migrated = initializePredictionLedger(workspace, SAMPLE_CASH_5, new Date('2026-08-05T00:00:00.000Z'));
-  assert.equal(migrated.workspace.predictionTracker.version, 4);
+  assert.equal(migrated.workspace.predictionTracker.version, 8);
   assert.deepEqual(migrated.workspace.sessions.find(session => session.id === scoredV1.id), scoredV1);
   const pending = migrated.workspace.sessions.find(session => session.id === pendingV1.id);
-  assert.equal(pending.analyzerVersion, 5);
+  assert.equal(pending.analyzerVersion, 10);
   assert.equal(pending.rows.filter(row => row.source === 'system').length, 3);
   assert.deepEqual(pending.rows.find(row => row.source !== 'system').numbers, userRow.numbers);
   assert.equal(pending.rows.find(row => row.source !== 'system').note, 'preserve me');
+
+  [null, { version: 8, initializedAt: '2026-08-01T00:00:00.000Z' }].forEach(predictionTracker => {
+    const result = initializePredictionLedger({ sessions: [pendingV1], predictionTracker }, SAMPLE_CASH_5);
+    const restored = result.workspace.sessions.find(session => session.id === pendingV1.id);
+    assert.equal(result.initialized, true);
+    assert.equal(restored.analyzerVersion, 10);
+    assert.equal(restored.rows.filter(row => row.source === 'system').length, 3);
+    assert.deepEqual(restored.rows.find(row => row.source !== 'system').numbers, userRow.numbers);
+  });
 });
 
 test('prediction scoring records exact, ending, tens, and every signal outcome', () => {
@@ -203,6 +213,25 @@ test('prediction scoring records exact, ending, tens, and every signal outcome',
   assert.equal(row.positions[1].diagnostic, 'tens right / ending wrong');
   assert.deepEqual(scored.result.patternSignalScores.map(item => item.hit), [true, false]);
   assert.equal(scored.result.patternSummary.families.find(item => item.pattern === 'inline').hits, 1);
+  assert.equal(scored.result.sourceScores, null);
+});
+
+test('scored sessions record each study track’s top ending against the actual ones digits', () => {
+  const session = createPredictionSession(SAMPLE_CASH_5);
+  assert.equal(session.sourceForecasts.length, 5);
+  const scored = scorePredictionSession(session, {
+    id: 'after',
+    date: '2026-08-05',
+    numbers: [2, 7, 18, 29, 40]
+  });
+  assert.equal(scored.result.sourceScores.columns.length, 5);
+  assert.deepEqual(scored.result.sourceScores.sources.map(item => item.key), ['combo', 'history', 'pattern', 'hncde']);
+  scored.result.sourceScores.sources.forEach(item => {
+    assert.equal(item.trials, 5);
+    assert.ok(item.hits >= 0 && item.hits <= 5);
+  });
+  const comboHits = scored.result.sourceScores.columns.filter(column => column.sources.combo.hit).length;
+  assert.equal(scored.result.sourceScores.sources.find(item => item.key === 'combo').hits, comboHits);
 });
 
 test('ticket matches count and highlight a drawn number even when its sorted Ball position shifts', () => {
@@ -281,11 +310,42 @@ test('automatic tens preserve manual bands and a manual Any tens choice', () => 
   assert.ok(selected.tensSources.slice(2).every(source => source === 'automatic'));
 });
 
+test('automatic tens recover when stale range-only choices block mapped endings', () => {
+  const selected = autoSelectTensFilters({
+    futureDigitMap: [3, 2, 7, 8, 5].map((digit, column) => ({ column, digit })),
+    slipNumbers: [null, null, null, null, null],
+    slipTensFilters: [0, 0, 0, 0, 0],
+    slipTensSources: ['manual', 'manual', 'manual', 'manual', 'manual']
+  }, SAMPLE_CASH_5);
+
+  assert.deepEqual(selected.tensFilters, [0, 1, 2, 2, 3]);
+  assert.deepEqual(selected.tensSources, ['automatic', 'automatic', 'automatic', 'automatic', 'automatic']);
+});
+
+test('automatic tens keep manual full-number constraints during stale-range recovery', () => {
+  const selected = autoSelectTensFilters({
+    futureDigitMap: [3, 2, 7, 8, 5].map((digit, column) => ({ column, digit })),
+    slipNumbers: [3, null, null, null, null],
+    slipTensFilters: [0, 0, 0, 0, 0],
+    slipTensSources: ['manual', 'manual', 'manual', 'manual', 'manual']
+  }, SAMPLE_CASH_5);
+
+  assert.equal(selected.tensFilters[0], 0);
+  assert.equal(selected.tensSources[0], 'manual');
+  assert.deepEqual(selected.tensFilters.slice(1), [1, 2, 2, 3]);
+  assert.deepEqual(selected.tensSources.slice(1), ['automatic', 'automatic', 'automatic', 'automatic']);
+});
+
 test('historical summary separates system ranks from user lines', () => {
   const initialized = initializePredictionLedger({ sessions: [] }, SAMPLE_CASH_5).workspace;
   const summary = summarizePredictionHistory(initialized.sessions);
-  assert.equal(summary.groups.find(group => group.key === 'system-1').trials, 50);
+  const system1 = summary.groups.find(group => group.key === 'system-1');
+  assert.equal(system1.label, 'Core');
+  assert.ok(system1.trials > 0);
+  assert.equal(system1.trials % 5, 0);
+  assert.ok(system1.trials <= 50);
   assert.equal(summary.groups.find(group => group.key === 'user').trials, 0);
   assert.ok(summary.patterns.families.length >= 7);
   assert.ok(summary.patterns.families.every(item => item.hits <= item.trials));
+  assert.ok(summary.groups.every(group => Object.hasOwn(group, 'numberHits') && Object.hasOwn(group, 'exactPositionHits')));
 });

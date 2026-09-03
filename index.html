@@ -15,7 +15,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=21">
+  <link rel="stylesheet" href="css/styles.css?v=46">
 </head>
 <body>
   <header class="app-toolbar">
@@ -75,9 +75,9 @@
         <header class="surface-header">
           <div><span class="eyebrow">Latest 10 drawings</span><h2>Draw History</h2></div>
           <div class="surface-actions">
-            <label class="tens-reference-toggle">
-              <input type="checkbox" id="chkTens">
-              <span>Show tens</span>
+            <label class="complete-number-toggle">
+              <input type="checkbox" id="chkCompleteNumbers">
+              <span>Show complete number</span>
             </label>
             <div class="popover-wrap">
               <button class="btn btn-secondary" id="btnPatterns" type="button" aria-expanded="false" aria-controls="patternsPopover">
@@ -86,15 +86,21 @@
               </button>
               <div class="popover pattern-popover" id="patternsPopover" hidden>
                 <strong>Relationship overlays</strong>
-                <label><input type="checkbox" id="chkMatches"><i class="legend-dot match"></i><span>Adjacent digit matches</span></label>
+                <label><input type="checkbox" id="chkMatches"><i class="legend-dot match"></i><span>Adjacent matches</span></label>
                 <label><input type="checkbox" id="chkVerticalRuns"><i class="legend-dot vertical"></i><span>Same-column runs</span></label>
                 <label><input type="checkbox" id="chkDiagonalRuns"><i class="legend-dot sister"></i><span>Left/right sister shifts</span></label>
                 <label><input type="checkbox" id="chkMathematicalSequences"><i class="legend-dot math"></i><span>Three-draw sequences</span></label>
                 <label><input type="checkbox" id="chkDiagonalMathematicalSequences"><i class="legend-dot math-diagonal"></i><span>Three-draw diagonal sequences</span></label>
                 <label><input type="checkbox" id="chkSisterOutputSequences"><i class="legend-dot math-sister-output"></i><span>Three-draw sister outputs</span></label>
                 <label><input type="checkbox" id="chkLPatterns"><i class="legend-dot math-l"></i><span>L-pattern sequences</span></label>
+                <label><input type="checkbox" id="chkInvertedLPatterns"><i class="legend-dot math-inverted-l"></i><span>Inverted L sequences</span></label>
+                <label><input type="checkbox" id="chkKnightShifts"><i class="legend-dot knight"></i><span>Knight shifts</span></label>
+                <label><input type="checkbox" id="chkSkipRowVerticals"><i class="legend-dot skip-row"></i><span>Skip-row column runs</span></label>
+                <label><input type="checkbox" id="chkTwinEndings"><i class="legend-dot twin"></i><span>Twin endings</span></label>
+                <label><input type="checkbox" id="chkConsecutivePairs"><i class="legend-dot consecutive"></i><span>Consecutive pairs</span></label>
+                <label><input type="checkbox" id="chkPivotPools"><i class="legend-dot pivot-pool"></i><span>Pivot Pools</span></label>
+                <label><input type="checkbox" id="chkWinningPivotPoints"><i class="legend-dot winning-pivot"></i><span>Winning Pivot Point</span></label>
                 <label><input type="checkbox" id="chkWinningPatterns"><i class="legend-dot winning"></i><span>Winning Patterns</span></label>
-                <input type="checkbox" id="chkOnes" checked disabled hidden>
               </div>
             </div>
             <button class="btn btn-secondary" id="btnAnnotate" type="button" aria-pressed="false" aria-controls="annotationToolbar">
@@ -121,22 +127,65 @@
           <button class="text-btn" id="btnCompleteConnection" type="button">Finish line</button>
           <button class="text-btn danger" id="btnClearAllLines" type="button">Clear all</button>
         </div>
-        <div class="repeat-summary-strip" id="digitRepeatSummary" aria-label="Hot, neutral, cold, declining, and emerging digit summary"></div>
+        <div class="repeat-summary-strip" id="digitRepeatSummary" aria-label="Hot, cold, neutral, declining, and emerging digit summary"></div>
+        <div class="pivot-pool-reference" id="pivotPoolReference" aria-live="polite" hidden></div>
+        <div class="winning-pivot-reference" id="winningPivotReference" aria-live="polite" hidden></div>
+        <div class="number-theme-alert" id="historyThemeAlert" hidden aria-live="assertive"></div>
         <div class="matrix-scroll" aria-label="Historical draw digit matrix">
           <div class="grid-wrapper" id="gridWrapper">
             <svg class="svg-overlay" id="svgOverlay"></svg>
             <div id="gridContainer"></div>
           </div>
         </div>
-        <p class="matrix-hint">Mapped Next Draw digits highlight every matching ones digit here; two mapped positions use concentric Ball-color rings. Use Patterns to reveal other relationships or Annotate to add your own notes.</p>
+        <p class="matrix-hint">Your pick appears as the Next drawing row under Latest. Enable Winning Patterns and check that row to see overlays land on it. Mapped Next Draw endings highlight matching cells in either view.</p>
       </article>
 
       <article class="surface next-board-surface future-map-card" id="futureMapCard">
         <header class="surface-header">
           <div><span class="eyebrow">Plan by position</span><h2>Next Draw Board</h2></div>
-          <div class="surface-actions"><button class="text-btn" id="btnClearFutureMap" type="button">Clear board</button><button class="btn btn-secondary" id="btnJumpToSlip" type="button">Build slip ↓</button></div>
+          <div class="surface-actions"><button class="text-btn" id="btnClearFutureMap" type="button">Clear board</button><button class="btn btn-secondary" id="btnJumpToSlip" type="button">Your pick ↓</button></div>
         </header>
-        <p class="surface-intro">Each row is a complete five-number line, assembled from position history, calibrated pattern support, current H/N/C/D/E state, recency, and four-draw proximity. The three lines form a coverage portfolio: no full number repeats, and every Ball column uses three different endings. Standard recommendations also allow no more than two numbers with the same ending. Scores describe historical agreement, not lottery probability.</p>
+        <p class="surface-intro" id="nextDrawIntro">Steer the ending pool, then let the app play Core, Spread, and Guard from that tell so one favourite digit cannot eat the slip.</p>
+        <details class="board-guide" id="nextDrawGuide">
+          <summary>How to use this board</summary>
+          <div class="board-guide-body">
+            <p>Two jobs, in this order: you shrink 0–9 from the latest official row, then the app turns that tell into tickets so one favourite digit cannot eat the slip. Cash 5 still pays on five whole numbers. Tens are only 0–4. The real work here is the ones digits.</p>
+            <h3>Ending pool</h3>
+            <p><strong>Source</strong> is last night’s endings. Example: 15 25 28 30 38 shows as 5 5 8 0 8. That is the input. Nothing here has seen tomorrow.</p>
+            <p><strong>Chooser</strong> picks which digit is the pivot:</p>
+            <ul>
+              <li><strong>High</strong> — largest ending (8 in that row). Default.</li>
+              <li><strong>Low</strong> — smallest ending (0).</li>
+              <li><strong>Tightest</strong> — try every unique digit and keep the one whose math makes the smallest pool.</li>
+              <li><strong>0 + alternate</strong> — if 0 is on the row, use 0 plus a partner (often a digit the previous pivot produced, like 2 from 10 − 8). 0 alone just copies the row.</li>
+              <li><strong>Manual</strong> — click 1–2 of the digit cards yourself.</li>
+            </ul>
+            <p>Each digit card is a unique ending on that row. Click one or two to set the pivot. The pool is <strong>pivot ± every other ending</strong> on last night’s row, using the ones digit. Example: high 9 against 6, 7, and 8 is 9±6=3/5, 9±7=2/6, 9±8=1/7, so the pool is 1 2 3 5 6 7. The pivot itself is not added unless an equation produces it. A chip with an amber ring was also on the source row, so it can repeat. The lists of 06 · 16 · 26 · 36 are the full Cash 5 numbers those endings allow.</p>
+            <p>Equations and extra operator toggles live under <strong>Reference</strong> if you want the work shown.</p>
+            <h3>Core, Spread, Guard</h3>
+            <p>These three system lines rebuild whenever the pool changes. They are not Quick Picks and not quality ranks.</p>
+            <ul>
+              <li><strong>Core</strong> plays the strongest tell first (endings with the most live equations, including the pivot).</li>
+              <li><strong>Spread</strong> uses the same pool, different tens, no repeated numbers.</li>
+              <li><strong>Guard</strong> plays pool digits you are likely to ignore when you lock onto one number. Still inside the pool.</li>
+            </ul>
+            <p>The small digit under each number is the ending. Hover or click a number for the why, such as “17 · ending 7 from 15 − 8.” If you see a dash on Guard or Spread, the pool is so tight there are not 15 legal numbers. The app leaves the line blank rather than grabbing random 1–42. A 3-ending pool often only fills Core and Spread. That is honest.</p>
+            <p><strong>Show all digits</strong> is research (what historically followed this Ball’s ending). It does not pick tickets. <strong>Your pick</strong> below the board is an extra line if you want one. The three system lines are already the app’s answer.</p>
+            <h3>Whole-number themes</h3>
+            <p>Sometimes the picture is the complete numbers, not the 0–9 pool: a consecutive pair sliding for several draws, a high cluster like 36–39, an exact number coming back under a new identity. When that stacks, the board flashes <strong>Whole-number theme live</strong>, highlights those numbers in Draw History, and offers a theme line you can drop into Your pick. That is a shape alert, not a jackpot claim. Watch the complete numbers when it fires.</p>
+            <h3>Tonight</h3>
+            <ol>
+              <li>Look at Source. That is last night’s endings.</li>
+              <li>Start with High, or click the digit you actually see as the pivot.</li>
+              <li>Read Pool. Those endings, and the full numbers under them, are the tell.</li>
+              <li>Stop. Do not hunt for a prettier 8. That is the “too focused” failure.</li>
+              <li>Read Core / Spread / Guard. Those are the three slips. Click any number for the why.</li>
+              <li>Save for the next draw when you are done. Changing the pool updates pending system lines; scored old sessions stay frozen.</li>
+            </ol>
+          </div>
+        </details>
+        <section class="pivot-workbench" id="pivotWorkbench" aria-label="Ending pool workbench"></section>
+        <div class="next-draw-tracks" id="nextDrawTracks" aria-label="Next draw evidence tracks" hidden></div>
           <div class="future-map-legend" aria-label="Next draw board legend">
             <span><i class="intuition"></i>Mapped selection</span>
             <span><i class="successor-rank-1"></i>#1</span>
@@ -144,10 +193,6 @@
             <span><i class="successor-rank-3"></i>#3</span>
           </div>
         <div id="futureDigitGrid" class="future-digit-grid"></div>
-        <section class="system-line-panel" aria-labelledby="systemLineTitle">
-          <div class="system-line-heading"><div><span>15-number coverage portfolio</span><h3 id="systemLineTitle">Recommended Complete Lines</h3></div><small>Distinct number + ending coverage</small></div>
-          <div id="futureSystemLines" class="system-line-list"></div>
-        </section>
         <details class="all-digits-disclosure" id="allDigitsDisclosure">
           <summary>Show all digits</summary>
           <p>Historical successor colors show which endings followed the latest digit in the same Ball position.</p>
@@ -159,9 +204,24 @@
           </div>
           <div id="futureAllDigitGrid" class="future-digit-grid all-digit-grid"></div>
         </details>
-        <div id="futureMapInspector" class="future-map-inspector empty-state">Choose a digit and position to inspect its recent context.</div>
       </article>
     </section>
+
+    <article class="surface composer-card user-pick-panel" id="composerCard" aria-labelledby="userPickTitle">
+      <header class="surface-header">
+        <div><span class="eyebrow">Your extra line</span><h2 id="userPickTitle">Your pick</h2></div>
+        <div class="slip-progress" id="slipProgress">0 of 5 selected</div>
+      </header>
+      <p class="slip-intro">The three system lines on the Next Draw Board are already saved with the session. Use this only for an extra user line. For each ball, optionally set a tens range, then choose a full number. Unavailable ranges stay disabled when mapped endings, chosen numbers, or the 1–42 limit would prevent an increasing row.</p>
+      <div class="slip-builder" id="rowBuilder"></div>
+      <div class="slip-action-bar">
+        <p id="slipGuidance">Start with any ball. You can change every choice before saving the row.</p>
+        <div><button class="text-btn" id="btnClearSlip" type="button">Clear pick</button><button class="btn btn-primary" id="btnAddDraftRow" type="button">Save row</button></div>
+      </div>
+      <div id="draftRows" class="draft-rows empty-state">No saved user rows yet.</div>
+      <div class="finalize-bar"><p>Keep your extra lines beside the three system lines for the next official draw.</p><button class="btn btn-primary" id="btnFinalizeSession" type="button">Save for next draw</button></div>
+      <div class="finalize-share-prompt" id="finalizeSharePrompt" hidden aria-live="polite"></div>
+    </article>
 
     <section class="analysis-panels" aria-label="Detailed analysis">
       <details class="surface disclosure optional-tool">
@@ -194,21 +254,13 @@
         </div>
       </details>
 
-      <article class="surface composer-card" id="composerCard">
-        <header class="surface-header">
-          <div><span class="eyebrow">Your next step</span><h2>Build Your 5-Number Slip</h2></div>
-          <div class="slip-progress" id="slipProgress">0 of 5 selected</div>
-        </header>
-        <p class="slip-intro">For each ball, review the fuzzy tens recommendation, optionally apply it, then choose a full number. Unavailable ranges are disabled when mapped endings, chosen numbers, or the 1–42 limit would prevent an increasing five-number row. Recommendations blend position frequency, recency, and neighboring-position history; they describe the latest 10 draws and do not predict the next one.</p>
-        <div class="slip-builder" id="rowBuilder"></div>
-        <div class="slip-action-bar">
-          <p id="slipGuidance">Start with any ball position. You can change every choice before adding the row.</p>
-          <div><button class="text-btn" id="btnClearSlip" type="button">Clear slip</button><button class="btn btn-primary" id="btnAddDraftRow" type="button">Save row</button></div>
+      <details class="surface disclosure optional-tool" id="historicalPerformanceCard">
+        <summary><span><small>Optional outcome analysis</small><strong>Historical Performance</strong></span><span class="summary-action">Open</span></summary>
+        <div class="disclosure-body performance-analysis" id="historicalPerformance">
+          <div class="empty-state">Scored saved sessions will appear here.</div>
         </div>
-        <div id="draftRows" class="draft-rows empty-state">No saved rows yet.</div>
-        <div class="finalize-bar"><p>Save these lines beside the system ranks and pattern snapshot for the next official draw.</p><button class="btn btn-primary" id="btnFinalizeSession" type="button">Save for next draw</button></div>
-        <div class="finalize-share-prompt" id="finalizeSharePrompt" hidden aria-live="polite"></div>
-      </article>
+      </details>
+
     </section>
 
     <footer class="app-footer">
@@ -220,12 +272,12 @@
   <aside class="sessions-panel" id="sessionsPanel" hidden aria-label="Saved Sessions">
     <div class="sessions-backdrop" data-close-sessions></div>
     <section class="sessions-drawer" role="dialog" aria-modal="true" aria-labelledby="sessionsTitle">
-      <header><div><span class="eyebrow">Historical outcome ledger</span><h2 id="sessionsTitle">Saved Sessions</h2></div><button class="icon-btn" id="btnCloseSessions" type="button" aria-label="Close saved sessions">×</button></header>
+      <header><div><span class="eyebrow">Picks compared with results</span><h2 id="sessionsTitle">Saved Sessions</h2></div><button class="icon-btn" id="btnCloseSessions" type="button" aria-label="Close saved sessions">×</button></header>
       <div id="sessionHistory" class="session-history empty-state">No saved sessions yet.</div>
     </section>
   </aside>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  <script type="module" src="js/app.js?v=34"></script>
+  <script type="module" src="js/app.js?v=59"></script>
 </body>
 </html>

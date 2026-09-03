@@ -1,12 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyNextDrawingPick,
+  applySystemDrawingPick,
+  applyUserDigitPick,
   buildFutureWorkspaceModel,
   futureCellEvidence,
+  nextDrawingPreviewNumbers,
   normalizeFutureDigitMap,
   rankHistoricalSuccessors,
   selectFutureDigit
 } from '../js/futureWorkspace.js';
+import { autoSelectTensFilters } from '../js/sessionStore.js';
+import { tensDigitForNumber } from '../js/fuzzyTens.js';
+import { SAMPLE_CASH_5 } from '../js/sampleData.js';
 
 const draws = [
   { id: 'past', date: '2026-01-01', numbers: [2, 13, 24, 35, 41] },
@@ -134,6 +141,157 @@ test('historical successors limit analysis to the newest 50 valid draws', () => 
   const firstBall = rankHistoricalSuccessors(history)[0];
   assert.equal(firstBall.totalTransitions, 1);
   assert.deepEqual(firstBall.candidates.map(item => item.digit), [7]);
+});
+
+function blankPickWorkspace() {
+  return {
+    slipNumbers: [null, null, null, null, null],
+    slipTensFilters: [null, null, null, null, null],
+    slipTensSources: ['empty', 'empty', 'empty', 'empty', 'empty'],
+    futureDigitMap: [],
+    systemDigitMap: [],
+    systemSlipNumbers: [null, null, null, null, null],
+    nextDrawingPreviewHidden: false,
+    rowBuilder: []
+  };
+}
+
+test('Next drawing preview keeps the latest user line after the picker is cleared', () => {
+  const draft = { numbers: [4, 12, 23, 34, 41] };
+  assert.deepEqual(nextDrawingPreviewNumbers({
+    slipNumbers: [null, null, null, null, null],
+    draftRows: [draft],
+    sessions: []
+  }, '2026-01-02'), draft.numbers);
+
+  assert.deepEqual(nextDrawingPreviewNumbers({
+    slipNumbers: [null, null, null, null, null],
+    draftRows: [],
+    sessions: [{
+      kind: 'prediction',
+      baselineDate: '2026-01-02',
+      rows: [{ source: 'system', numbers: [1, 2, 3, 4, 5] }, { source: 'user', numbers: [6, 17, 28, 39, 40] }]
+    }]
+  }, '2026-01-02'), [6, 17, 28, 39, 40]);
+});
+
+test('Clear Board suppresses saved preview fallbacks until a new pick is made', () => {
+  const hidden = {
+    ...blankPickWorkspace(),
+    nextDrawingPreviewHidden: true,
+    draftRows: [{ numbers: [4, 12, 23, 34, 41] }],
+    sessions: [{
+      kind: 'prediction',
+      baselineDate: '2026-01-02',
+      rows: [{ source: 'user', numbers: [6, 17, 28, 39, 40] }]
+    }]
+  };
+  assert.deepEqual(nextDrawingPreviewNumbers(hidden, '2026-01-02'), [null, null, null, null, null]);
+
+  const picked = applyUserDigitPick(hidden, { column: 0, digit: 4 });
+  assert.equal(picked.nextDrawingPreviewHidden, false);
+  assert.deepEqual(nextDrawingPreviewNumbers(picked, '2026-01-02'), [4, null, null, null, null]);
+});
+
+test('an in-progress user line remains the preview source over saved rows', () => {
+  assert.deepEqual(nextDrawingPreviewNumbers({
+    slipNumbers: [null, 16, null, null, null],
+    draftRows: [{ numbers: [4, 12, 23, 34, 41] }],
+    sessions: []
+  }, '2026-01-02'), [null, 16, null, null, null]);
+});
+
+test('ending-digit maps and system picks each provide an independent preview source', () => {
+  assert.deepEqual(nextDrawingPreviewNumbers({
+    slipNumbers: [null, null, null, null, null],
+    futureDigitMap: [{ column: 0, digit: 4 }, { column: 2, digit: 0 }],
+    systemSlipNumbers: [2, null, null, null, null]
+  }), [4, null, 10, null, null]);
+
+  assert.deepEqual(nextDrawingPreviewNumbers({
+    slipNumbers: [null, null, null, null, null],
+    futureDigitMap: [],
+    systemSlipNumbers: [2, null, 27, null, null]
+  }), [2, null, 27, null, null]);
+});
+
+test('system full-number clicks update only the system preview state', () => {
+  const workspace = blankPickWorkspace();
+  workspace.futureDigitMap = [{ column: 0, digit: 4 }];
+  const picked = applySystemDrawingPick(workspace, { column: 0, number: 2 });
+
+  assert.deepEqual(picked.slipNumbers, [null, null, null, null, null]);
+  assert.deepEqual(picked.futureDigitMap, [{ column: 0, digit: 4 }]);
+  assert.deepEqual(picked.systemDigitMap, [{ column: 0, digit: 2 }]);
+  assert.deepEqual(picked.systemSlipNumbers, [2, null, null, null, null]);
+  assert.deepEqual(picked.rowBuilder, []);
+
+  const cleared = applySystemDrawingPick(picked, { column: 0, number: 2 });
+  assert.deepEqual(cleared.slipNumbers, [null, null, null, null, null]);
+  assert.deepEqual(cleared.futureDigitMap, [{ column: 0, digit: 4 }]);
+  assert.deepEqual(cleared.systemDigitMap, []);
+  assert.deepEqual(cleared.systemSlipNumbers, [null, null, null, null, null]);
+});
+
+test('user digit clicks update the Next Draw line without changing Your Pick', () => {
+  const picked = applyUserDigitPick(blankPickWorkspace(), { column: 0, digit: 4 });
+  assert.deepEqual(picked.slipNumbers, [null, null, null, null, null]);
+  assert.deepEqual(picked.slipTensFilters, [null, null, null, null, null]);
+  assert.deepEqual(picked.slipTensSources, ['empty', 'empty', 'empty', 'empty', 'empty']);
+  assert.deepEqual(picked.rowBuilder, []);
+  assert.deepEqual(picked.futureDigitMap, [{ column: 0, digit: 4 }]);
+
+  const cleared = applyUserDigitPick(picked, { column: 0, digit: 4 });
+  assert.deepEqual(cleared.slipNumbers, [null, null, null, null, null]);
+  assert.deepEqual(cleared.futureDigitMap, []);
+});
+
+test('Next Draw full-number clicks place, replace, and toggle the matching ball', () => {
+  const placed = applyNextDrawingPick(blankPickWorkspace(), { column: 1, digit: 6, number: 16 });
+  assert.deepEqual(placed.slipNumbers, [null, 16, null, null, null]);
+  assert.equal(placed.slipTensFilters[1], 1);
+  assert.equal(placed.slipTensSources[1], 'manual');
+  assert.deepEqual(placed.futureDigitMap, [{ column: 1, digit: 6 }]);
+  assert.deepEqual(placed.rowBuilder, [16]);
+
+  const replaced = applyNextDrawingPick(placed, { column: 1, digit: 6, number: 26 });
+  assert.deepEqual(replaced.slipNumbers, [null, 26, null, null, null]);
+  assert.equal(replaced.slipTensFilters[1], 2);
+  assert.equal(replaced.slipTensSources[1], 'manual');
+  assert.deepEqual(replaced.futureDigitMap, [{ column: 1, digit: 6 }]);
+
+  const cleared = applyNextDrawingPick(replaced, { column: 1, digit: 6, number: 26 });
+  assert.deepEqual(cleared.slipNumbers, [null, null, null, null, null]);
+  assert.equal(cleared.slipTensSources[1], 'empty');
+  assert.deepEqual(cleared.futureDigitMap, []);
+});
+
+test('mapping-only Next Draw clicks do not invent a full number', () => {
+  const mapped = applyNextDrawingPick(blankPickWorkspace(), { column: 2, digit: 5 });
+  assert.deepEqual(mapped.slipNumbers, [null, null, null, null, null]);
+  assert.deepEqual(mapped.futureDigitMap, [{ column: 2, digit: 5 }]);
+});
+
+test('automatic tens keep a Next Draw pick in its ball after a system-cell click', () => {
+  const picked = applyNextDrawingPick(blankPickWorkspace(), { column: 0, number: 3 });
+  const selection = autoSelectTensFilters(picked, SAMPLE_CASH_5);
+  const kept = picked.slipNumbers.map((number, column) => {
+    if (!Number.isInteger(number) || selection.tensSources[column] === 'manual') return number;
+    const band = selection.tensFilters[column];
+    return Number.isInteger(band) && tensDigitForNumber(number) !== band ? null : number;
+  });
+  assert.equal(picked.slipTensSources[0], 'manual');
+  assert.equal(selection.tensSources[0], 'manual');
+  assert.deepEqual(kept, [3, null, null, null, null]);
+});
+
+test('Next Draw picks preserve a manual Any tens filter in another ball', () => {
+  const workspace = blankPickWorkspace();
+  workspace.slipTensSources[0] = 'manual';
+  const picked = applyNextDrawingPick(workspace, { column: 1, number: 16 });
+  assert.equal(picked.slipTensFilters[0], null);
+  assert.equal(picked.slipTensSources[0], 'manual');
+  assert.equal(picked.slipTensFilters[1], 1);
 });
 
 test('historical successors return only supported candidates for sparse data', () => {

@@ -154,7 +154,15 @@ export function validateProject(projectData) {
     }
   });
 
-  const manualLines = Array.isArray(projectData.manualLines) ? projectData.manualLines.filter(l => l && typeof l === 'object' && l.fromCellId && l.toCellId) : [];
+  const canonicalCellId = cellId => String(cellId).replace(/-b([0-4])-tens$/, '-b$1-ones');
+  const manualLines = Array.isArray(projectData.manualLines) ? projectData.manualLines
+    .filter(line => line && typeof line === 'object' && line.fromCellId && line.toCellId)
+    .map(line => ({
+      ...line,
+      fromCellId: canonicalCellId(line.fromCellId),
+      toCellId: canonicalCellId(line.toCellId)
+    }))
+    .filter(line => line.fromCellId !== line.toCellId) : [];
   const workspace = sanitizeWorkspace(projectData.workspace);
 
   return {
@@ -194,6 +202,8 @@ function sanitizeRows(rows) {
       id: String(row.id || `imported-row-${index}`),
       source,
       rank: source === 'system' && [1, 2, 3].includes(Number(row.rank)) ? Number(row.rank) : null,
+      role: source === 'system' && ['core', 'spread', 'guard'].includes(row?.role) ? row.role : null,
+      reasons: Array.isArray(row?.reasons) ? row.reasons.map(reason => String(reason || '').slice(0, 400)).slice(0, 5) : [],
       analyzerVersion: source === 'system' ? Math.max(1, Number(row.analyzerVersion) || 1) : null,
       available,
       unavailableReason: String(row.unavailableReason || '').slice(0, 500),
@@ -209,7 +219,10 @@ function sanitizeRows(rows) {
         historyFit: Number(row.selectionScore.historyFit) || 0,
         combined: Number(row.selectionScore.combined) || 0,
         pattern: Number(row.selectionScore.pattern) || 0,
-        stream: Number(row.selectionScore.stream) || 0
+        stream: Number(row.selectionScore.stream) || 0,
+        exactExpected: row.selectionScore.exactExpected === null || row.selectionScore.exactExpected === undefined ? null : Number(row.selectionScore.exactExpected) || 0,
+        endingExpected: row.selectionScore.endingExpected === null || row.selectionScore.endingExpected === undefined ? null : Number(row.selectionScore.endingExpected) || 0,
+        tensExpected: row.selectionScore.tensExpected === null || row.selectionScore.tensExpected === undefined ? null : Number(row.selectionScore.tensExpected) || 0
       } : null,
       numberEvidence: Array.isArray(row.numberEvidence) ? row.numberEvidence.slice(0, 5).map(item => ({
         number: Number(item?.number) || 0,
@@ -230,6 +243,15 @@ function sanitizeRows(rows) {
         score: Math.max(0, Math.min(100, Number(item?.score) || 0)),
         combinedScore: Math.max(0, Math.min(100, Number(item?.combinedScore) || 0)),
         patternScore: Math.max(0, Math.min(100, Number(item?.patternScore) || 0)),
+        comboProbability: item?.comboProbability === null || item?.comboProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.comboProbability) || 0)),
+        comboEndingProbability: item?.comboEndingProbability === null || item?.comboEndingProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.comboEndingProbability) || 0)),
+        empiricalProbability: item?.empiricalProbability === null || item?.empiricalProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.empiricalProbability) || 0)),
+        modelProbability: item?.modelProbability === null || item?.modelProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.modelProbability) || 0)),
+        endingProbability: item?.endingProbability === null || item?.endingProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.endingProbability) || 0)),
+        tensProbability: item?.tensProbability === null || item?.tensProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.tensProbability) || 0)),
+        historyProbability: item?.historyProbability === null || item?.historyProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.historyProbability) || 0)),
+        patternProbability: item?.patternProbability === null || item?.patternProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.patternProbability) || 0)),
+        stateProbability: item?.stateProbability === null || item?.stateProbability === undefined ? null : Math.max(0, Math.min(1, Number(item.stateProbability) || 0)),
         streamScore: Math.max(0, Math.min(100, Number(item?.streamScore) || 0)),
         streamDistance: Math.max(0, Number(item?.streamDistance) || 0),
         forecast: item?.forecast === null ? null : Number(item?.forecast) || 0,
@@ -269,6 +291,13 @@ function sanitizeSlipNumbers(values, legacyRowBuilder = []) {
     }
   }
   return result;
+}
+
+function sanitizePositionNumbers(values) {
+  return Array.from({ length: 5 }, (_, index) => {
+    const parsed = parseStrictInteger(Array.isArray(values) ? values[index] : null);
+    return parsed !== null && parsed >= 1 && parsed <= 42 ? parsed : null;
+  });
 }
 
 function sanitizeSlipTensFilters(values) {
@@ -340,10 +369,15 @@ function sanitizeRowScores(scores) {
       available: score?.available !== false,
       unavailableReason: String(score?.unavailableReason || '').slice(0, 500),
       hits: Math.max(0, Math.min(5, Number(score?.hits) || 0)),
+      matchTier: Math.max(0, Math.min(5, Number(score?.matchTier ?? score?.hits) || 0)),
+      prizeTier: String(score?.prizeTier || ((Number(score?.hits) || 0) >= 2 ? `match-${Number(score.hits)}` : 'none')).slice(0, 20),
+      wonPrizeTier: Boolean(score?.wonPrizeTier ?? ((Number(score?.hits) || 0) >= 2)),
       misses: Math.max(0, Math.min(5, Number(score?.misses) || 0)),
       matchRate: score?.matchRate === null ? null : Math.max(0, Math.min(1, Number(score?.matchRate) || 0)),
       missRate: score?.missRate === null ? null : Math.max(0, Math.min(1, Number(score?.missRate) || 0)),
-      exactPositionHits: Math.max(0, Math.min(5, Number(score?.exactPositionHits) || 0)),
+      exactPositionHits: score?.exactPositionHits === null || score?.exactPositionHits === undefined
+        ? (positions.length === 5 ? positions.filter(item => item.exact).length : null)
+        : Math.max(0, Math.min(5, Number(score.exactPositionHits) || 0)),
       endingHits: Math.max(0, Math.min(5, Number(score?.endingHits) || 0)),
       endingRate: score?.endingRate === null ? null : Math.max(0, Math.min(1, Number(score?.endingRate) || 0)),
       tensHits: Math.max(0, Math.min(5, Number(score?.tensHits) || 0)),
@@ -353,6 +387,119 @@ function sanitizeRowScores(scores) {
       positions
     };
   });
+}
+
+function sanitizeSourceTop(value) {
+  const digit = Number(value?.digit);
+  return {
+    digit: Number.isInteger(digit) && digit >= 0 && digit <= 9 ? digit : null,
+    probability: value?.probability === null || value?.probability === undefined
+      ? null
+      : Math.max(0, Math.min(1, Number(value.probability) || 0))
+  };
+}
+
+function sanitizeSourceForecasts(forecasts) {
+  if (!Array.isArray(forecasts)) return [];
+  return Array.from({ length: 5 }, (_, column) => {
+    const item = forecasts.find(entry => Number(entry?.column) === column) || forecasts[column] || {};
+    return {
+      column,
+      combo: sanitizeSourceTop(item.combo),
+      history: sanitizeSourceTop(item.history),
+      pattern: sanitizeSourceTop(item.pattern),
+      hncde: sanitizeSourceTop(item.hncde)
+    };
+  });
+}
+
+function sanitizeTrackForecasts(forecasts) {
+  if (!Array.isArray(forecasts)) return [];
+  const definitions = new Map([
+    ['control', { color: 'blue', sourceKey: 'combo' }],
+    ['temporal', { color: 'red', sourceKey: 'history' }],
+    ['structure', { color: 'green', sourceKey: 'pattern' }],
+    ['hncde', { color: 'yellow', sourceKey: 'hncde' }]
+  ]);
+  return forecasts.map(track => {
+    const key = String(track?.key || '');
+    const definition = definitions.get(key);
+    if (!definition) return null;
+    const columns = Array.from({ length: 5 }, (_, column) => {
+      const item = track?.columns?.find(entry => Number(entry?.column) === column) || track?.columns?.[column] || {};
+      const distribution = Array.from({ length: 10 }, (_, digit) => Math.max(0, Math.min(1, Number(item?.distribution?.[digit]) || 0)));
+      const fullNumberCandidates = Array.isArray(item?.fullNumberCandidates) ? item.fullNumberCandidates.slice(0, 12).map(candidate => ({
+        number: Math.max(1, Math.min(42, Number(candidate?.number) || 1)),
+        digit: Math.max(0, Math.min(9, Number(candidate?.digit) || 0)),
+        column,
+        studyScore: Math.max(0, Number(candidate?.studyScore) || 0),
+        supportingTracks: Array.isArray(candidate?.supportingTracks)
+          ? candidate.supportingTracks.map(String).filter(value => definitions.has(value)).slice(0, 4)
+          : []
+      })) : [];
+      return {
+        column,
+        distribution,
+        topDigits: Array.isArray(item?.topDigits) ? item.topDigits.slice(0, 3).map(sanitizeSourceTop) : [],
+        successorCandidates: Array.isArray(item?.successorCandidates) ? item.successorCandidates.slice(0, 4).map(candidate => ({
+          digit: Math.max(0, Math.min(9, Number(candidate?.digit) || 0)),
+          rank: Math.max(1, Math.min(4, Number(candidate?.rank) || 1)),
+          count: Math.max(0, Number(candidate?.count) || 0),
+          mostRecentTransitionDate: String(candidate?.mostRecentTransitionDate || '')
+        })) : [],
+        fullNumberCandidates
+      };
+    });
+    return {
+      key,
+      sourceKey: definition.sourceKey,
+      color: definition.color,
+      label: String(track?.label || '').slice(0, 80),
+      status: ['control', 'study', 'promoted'].includes(track?.status) ? track.status : 'study',
+      sampleSize: Math.max(0, Number(track?.sampleSize) || 0),
+      evidenceId: String(track?.evidenceId || '').slice(0, 160),
+      columns,
+      pivotEvidence: key === 'structure' && track?.pivotEvidence ? {
+        valid: Boolean(track.pivotEvidence.valid),
+        mode: ['low', 'high', 'both'].includes(track.pivotEvidence.mode) ? track.pivotEvidence.mode : 'both',
+        sourceDrawId: String(track.pivotEvidence.sourceDrawId || ''),
+        sourceDate: String(track.pivotEvidence.sourceDate || ''),
+        digits: Array.isArray(track.pivotEvidence.digits)
+          ? track.pivotEvidence.digits.map(Number).filter(digit => Number.isInteger(digit) && digit >= 0 && digit <= 9)
+          : [],
+        equations: Array.isArray(track.pivotEvidence.equations) ? track.pivotEvidence.equations.map(String).slice(0, 40) : [],
+        columns: columns.map(item => ({ column: item.column, candidates: item.fullNumberCandidates }))
+      } : null
+    };
+  }).filter(Boolean);
+}
+
+function sanitizeSourceScores(scores) {
+  if (!scores || typeof scores !== 'object') return null;
+  const columns = Array.isArray(scores.columns) ? scores.columns.slice(0, 5).map((item, index) => ({
+    column: Math.max(0, Math.min(4, Number(item?.column) || index)),
+    actualDigit: Math.max(0, Math.min(9, Number(item?.actualDigit) || 0)),
+    sources: Object.fromEntries(['combo', 'history', 'pattern', 'hncde'].map(key => {
+      const source = item?.sources?.[key] || {};
+      const predicted = Number(source.predictedDigit);
+      return [key, {
+        predictedDigit: Number.isInteger(predicted) && predicted >= 0 && predicted <= 9 ? predicted : null,
+        probability: source.probability === null || source.probability === undefined
+          ? null
+          : Math.max(0, Math.min(1, Number(source.probability) || 0)),
+        actualDigit: Math.max(0, Math.min(9, Number(source.actualDigit ?? item?.actualDigit) || 0)),
+        hit: Boolean(source.hit)
+      }];
+    }))
+  })) : [];
+  const sources = Array.isArray(scores.sources) ? scores.sources.map(item => ({
+    key: String(item?.key || '').slice(0, 20),
+    label: String(item?.label || '').slice(0, 80),
+    hits: Math.max(0, Number(item?.hits) || 0),
+    trials: Math.max(0, Number(item?.trials) || 0),
+    rate: item?.rate === null || item?.rate === undefined ? null : Math.max(0, Math.min(1, Number(item.rate) || 0))
+  })).filter(item => ['combo', 'history', 'pattern', 'hncde'].includes(item.key)) : [];
+  return { columns, sources };
 }
 
 function sanitizePatternSignalScores(scores) {
@@ -382,15 +529,33 @@ function sanitizeSessions(sessions) {
       date: String(rawResult.date || ''),
       numbers: resultNumbers,
       candidateHits: Math.max(0, Math.min(5, Number(rawResult.candidateHits) || 0)),
+      systemPortfolioCoverage: Math.max(0, Math.min(5, Number(rawResult.systemPortfolioCoverage) || 0)),
+      systemPrizeLines: Math.max(0, Math.min(3, Number(rawResult.systemPrizeLines) || 0)),
+      systemBestLineHits: Math.max(0, Math.min(5, Number(rawResult.systemBestLineHits) || 0)),
+      matchTierCounts: Object.fromEntries(Array.from({ length: 6 }, (_, hits) => [hits, Math.max(0, Number(rawResult.matchTierCounts?.[hits]) || 0)])),
       rowScores: sanitizeRowScores(rawResult.rowScores),
-      patternSignalScores: sanitizePatternSignalScores(rawResult.patternSignalScores)
+      patternSignalScores: sanitizePatternSignalScores(rawResult.patternSignalScores),
+      sourceScores: sanitizeSourceScores(rawResult.sourceScores)
     } : null;
     const kind = session.kind === 'prediction' ? 'prediction' : 'legacy';
+    const analyzerPolicyKind = ['control', 'combo', 'eb50', 'challenger', 'evidence'].includes(session.analyzerPolicy?.kind)
+      ? session.analyzerPolicy.kind
+      : 'combo';
     return {
       id: String(session.id || `imported-session-${index}`),
       kind,
       trackingVersion: kind === 'prediction' ? Math.max(1, Number(session.trackingVersion) || 1) : null,
       analyzerVersion: kind === 'prediction' ? Math.max(1, Number(session.analyzerVersion || session.trackingVersion) || 1) : null,
+      analyzerPolicy: kind === 'prediction' && session.analyzerPolicy && typeof session.analyzerPolicy === 'object' ? {
+        kind: analyzerPolicyKind,
+        priorStrength: Math.max(0, Number(session.analyzerPolicy.priorStrength) || 0),
+        patternWeight: Math.max(0, Math.min(0.3, Number(session.analyzerPolicy.patternWeight) || 0)),
+        stateWeight: Math.max(0, Math.min(0.3, Number(session.analyzerPolicy.stateWeight) || 0)),
+        comboWeight: Math.max(0, Math.min(1, Number(session.analyzerPolicy.comboWeight) || 0)),
+        historyWeight: Math.max(0, Math.min(1, Number(session.analyzerPolicy.historyWeight) || 0)),
+        recencyHalfLife: Math.max(1, Math.min(50, Number(session.analyzerPolicy.recencyHalfLife) || 12)),
+        evidenceId: String(session.analyzerPolicy.evidenceId || '').slice(0, 120)
+      } : null,
       creationSource: String(session.creationSource || (kind === 'prediction' ? 'imported' : 'legacy')).slice(0, 40),
       status: result ? 'scored' : kind === 'prediction' ? 'pending' : 'locked',
       finalizedAt: String(session.finalizedAt || new Date(0).toISOString()),
@@ -402,8 +567,25 @@ function sanitizeSessions(sessions) {
       motifMatches: Array.isArray(session.motifMatches) ? session.motifMatches : [],
       candidateDigits: Array.isArray(session.candidateDigits) ? [...new Set(session.candidateDigits.map(Number).filter(value => Number.isInteger(value) && value >= 0 && value <= 9))] : [],
       fullCandidates: sanitizeCash5Numbers(session.fullCandidates),
+      endingPool: Array.isArray(session.endingPool)
+        ? [...new Set(session.endingPool.map(Number).filter(digit => Number.isInteger(digit) && digit >= 0 && digit <= 9))]
+        : [],
       rows,
       patternSignals: sanitizePatternSignals(session.patternSignals),
+      trackForecasts: sanitizeTrackForecasts(session.trackForecasts),
+      pivotNumberEvidence: sanitizeTrackForecasts(session.trackForecasts).find(track => track.key === 'structure')?.pivotEvidence || null,
+      promotionPolicy: session.promotionPolicy && typeof session.promotionPolicy === 'object' ? {
+        analyzerVersion: Math.max(1, Number(session.promotionPolicy.analyzerVersion) || 1),
+        reportId: String(session.promotionPolicy.reportId || '').slice(0, 160),
+        status: session.promotionPolicy.status === 'promoted' ? 'promoted' : 'control-only',
+        activeTrack: ['control', 'temporal', 'structure', 'hncde'].includes(session.promotionPolicy.activeTrack) ? session.promotionPolicy.activeTrack : 'control',
+        promotedTrack: ['temporal', 'structure', 'hncde'].includes(session.promotionPolicy.promotedTrack) ? session.promotionPolicy.promotedTrack : null,
+        pivotMode: ['low', 'high', 'both'].includes(session.promotionPolicy.pivotMode) ? session.promotionPolicy.pivotMode : 'both',
+        archiveChecksum: String(session.promotionPolicy.archiveChecksum || '').slice(0, 128),
+        evidenceId: String(session.promotionPolicy.evidenceId || '').slice(0, 160)
+      } : null,
+      controlSeed: session.controlSeed === null || session.controlSeed === undefined ? null : (Number(session.controlSeed) >>> 0),
+      sourceForecasts: sanitizeSourceForecasts(session.sourceForecasts),
       streamSnapshot: Array.isArray(session.streamSnapshot) ? session.streamSnapshot.slice(0, 5).map((item, column) => ({
         column,
         available: item?.available !== false,
@@ -449,9 +631,30 @@ function sanitizeWorkspace(workspace) {
     mappingsByColumn.set(activeColumn, activeFutureCell);
   }
   const futureDigitMap = [...mappingsByColumn.values()].sort((a, b) => a.column - b.column);
+  const systemDigitMap = Array.isArray(workspace.systemDigitMap) ? workspace.systemDigitMap.map(item => {
+    const column = Number(item?.column);
+    const digit = Number(item?.digit);
+    return Number.isInteger(column) && column >= 0 && column <= 4
+      && Number.isInteger(digit) && digit >= 0 && digit <= 9
+      ? { column, digit }
+      : null;
+  }).filter(Boolean) : [];
   const rowBuilder = sanitizeCash5Numbers(workspace.rowBuilder).slice(0, 5);
+  const rawSlipNumbers = sanitizePositionNumbers(workspace.slipNumbers);
+  const rawSlipValues = rawSlipNumbers.filter(Number.isInteger);
+  const rawSlipIsIncreasing = rawSlipValues.every((number, index) => index === 0 || number > rawSlipValues[index - 1]);
+  const looksLikeLegacyDigitLeak = futureDigitMap.length > 0
+    && rawSlipValues.length > 0
+    && rawSlipNumbers.every((number, column) => (
+      !Number.isInteger(number)
+      || futureDigitMap.some(item => item.column === column && number === (item.digit === 0 ? 10 : item.digit))
+    ))
+    && !rawSlipIsIncreasing;
   return {
     futureDigitMap,
+    systemDigitMap,
+    systemSlipNumbers: sanitizePositionNumbers(workspace.systemSlipNumbers),
+    nextDrawingPreviewHidden: workspace.nextDrawingPreviewHidden === true,
     activeFutureCell,
     motifSelections: Array.isArray(workspace.motifSelections) ? workspace.motifSelections.map(item => {
       if (!item || !['past', 'present'].includes(item.role)) return null;
@@ -473,7 +676,9 @@ function sanitizeWorkspace(workspace) {
     selectedEvidenceDigit,
     fullCandidates: sanitizeCash5Numbers(workspace.fullCandidates),
     rowBuilder,
-    slipNumbers: sanitizeSlipNumbers(workspace.slipNumbers, rowBuilder),
+    // Older builds incorrectly copied digit-only map clicks into the extra
+    // line. Drop that malformed legacy state while preserving real rows.
+    slipNumbers: looksLikeLegacyDigitLeak ? [null, null, null, null, null] : sanitizeSlipNumbers(workspace.slipNumbers, rowBuilder),
     slipTensFilters: sanitizeSlipTensFilters(workspace.slipTensFilters),
     slipTensSources: sanitizeSlipTensSources(workspace.slipTensSources),
     draftRows: sanitizeRows(workspace.draftRows),
