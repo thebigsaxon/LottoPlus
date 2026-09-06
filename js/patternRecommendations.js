@@ -35,7 +35,7 @@ const SYSTEM_NUMBER_POOL_LIMIT = 15;
 const MAX_STANDARD_ENDING_MULTIPLICITY = 2;
 const SCORE_EPSILON = 1e-9;
 
-export const NEXT_DRAW_ANALYZER_VERSION = 10;
+export const NEXT_DRAW_ANALYZER_VERSION = 12;
 
 export const PATTERN_FAMILIES = {
   repeat: { label: 'Adjacent repeat' },

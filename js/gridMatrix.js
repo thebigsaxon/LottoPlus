@@ -1,6 +1,6 @@
 /** Cash 5 ending/full-number matrix renderer. */
 
-import { escapeHTML } from './validation.js?v=11';
+import { escapeHTML } from './validation.js?v=13';
 import { buildDigitHeatTimeline } from './repeatSummary.js?v=6';
 import { nextCalendarDate } from './dateUtils.js?v=1';
 import {

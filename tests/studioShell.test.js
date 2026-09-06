@@ -44,8 +44,8 @@ test('Cash 5 Studio shell exposes contextual pattern, annotation, and session su
   assert.match(html, /Ending pool workbench/);
   assert.match(html, /id="nextDrawGuide"/);
   assert.match(html, />How to use this board</);
-  assert.match(html, /you shrink 0–9 from the latest official row/);
-  assert.match(html, /Start with High/);
+  assert.match(html, /Source shows the latest official draw’s ones digits/);
+  assert.match(html, /Automatic reviews previous winning pivots/);
   assert.match(html, /id="futureAllDigitGrid"/);
   assert.match(html, /id="allDigitsDisclosure"/);
   assert.match(html, />Show all digits</);
@@ -116,7 +116,7 @@ test('position highlighting, click-off Patterns, and native sharing are wired', 
   assert.match(appSource, /onWinningRowToggleCallback/);
   assert.match(appSource, /analyzeNextDrawBoard\(this\.researchDraws, \{ limit: 3 \}\)/);
   assert.match(appSource, /buildPivotWorkbench\(this\.draws, this\.pivotWorkbenchSettings\)/);
-  assert.match(appSource, /feeds Core, Spread, and Guard/);
+  assert.match(appSource, /number-pool-grid/);
   assert.match(appSource, /pivot-workbench-reference/);
   assert.doesNotMatch(appSource, /Recency ∩/);
   assert.match(appSource, /data-workbench-chooser/);
@@ -200,7 +200,7 @@ test('interface zoom is persistent and constrained to readable steps', async () 
   assert.doesNotMatch(styles, /body\.zoom-enlarged \.primary-workspace/);
   assert.doesNotMatch(styles, /body\.zoom-extra \.primary-workspace/);
   assert.match(styles, /container: app-main \/ inline-size/);
-  assert.match(styles, /@container app-main \(max-width: 980px\)[\s\S]*?\.primary-workspace, \.motif-layout, \.evidence-layout \{ grid-template-columns: 1fr; \}/);
+  assert.match(styles, /@container app-main \(max-width: 1080px\)[\s\S]*?\.primary-workspace, \.motif-layout, \.evidence-layout \{ grid-template-columns: minmax\(0, 1fr\); \}/);
 });
 
 test('HNCDE rows contain each digit group and enlarge only the hovered card', async () => {
@@ -215,7 +215,7 @@ test('HNCDE rows contain each digit group and enlarge only the hovered card', as
   assert.match(styles, /\.row-hcn-values \{ min-width: 0; overflow: hidden; display: flex;/);
   assert.match(styles, /\.row-hcn-box \{[^}]*overflow: hidden;[^}]*cursor: zoom-in;/s);
   assert.match(styles, /\.row-hcn-box:hover \{[^}]*transform: scale\(1\.55\);/s);
-  assert.match(styles, /\.row-hcn-group > b sup \{[^}]*font-size: 8px;/s);
+  assert.match(styles, /\.row-hcn-group > b sup \{[^}]*font-size: 10px;/s);
   assert.doesNotMatch(styles, /\.matrix-scroll:has\(\.row-hcn-box:hover\)/);
 });
 

@@ -1,4 +1,4 @@
-import { analyzeNextDrawBoard } from './patternRecommendations.js?v=12';
+import { analyzeNextDrawBoard } from './patternRecommendations.js?v=13';
 import { pairedBootstrap } from './v6Evaluation.js?v=1';
 
 export const V9_WINDOWS = Object.freeze([25, 50, 100, 'expanding']);

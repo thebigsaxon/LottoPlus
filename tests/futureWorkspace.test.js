@@ -201,6 +201,21 @@ test('an in-progress user line remains the preview source over saved rows', () =
   }, '2026-01-02'), [null, 16, null, null, null]);
 });
 
+test('pool picks appear in the Next drawing preview as sorted full numbers', () => {
+  assert.deepEqual(nextDrawingPreviewNumbers({
+    poolPickDraft: { baselineDate: '2026-01-02', selectedNumbers: [32, 4, 18, 41, 7, 22] },
+    slipNumbers: [null, null, null, null, null]
+  }, '2026-01-02'), [4, 7, 18, 22, 32]);
+  assert.deepEqual(nextDrawingPreviewNumbers({
+    poolPickDraft: { baselineDate: '2026-01-01', selectedNumbers: [4] },
+    slipNumbers: [null, 16, null, null, null]
+  }, '2026-01-02'), [null, 16, null, null, null]);
+  assert.deepEqual(nextDrawingPreviewNumbers({
+    poolPickDraft: { baselineDate: '2026-01-02', selectedNumbers: [4] },
+    slipNumbers: [null, 16, null, null, null]
+  }, '2026-01-02'), [null, 16, null, null, null]);
+});
+
 test('ending-digit maps and system picks each provide an independent preview source', () => {
   assert.deepEqual(nextDrawingPreviewNumbers({
     slipNumbers: [null, null, null, null, null],

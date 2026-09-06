@@ -5,7 +5,7 @@ struct ContentView: View {
 
     var body: some View {
         WebView(triggerAction: $triggerAction)
-            .frame(minWidth: 1100, idealWidth: 1280, minHeight: 720, idealHeight: 850)
+            .frame(minWidth: 760, idealWidth: 1440, maxWidth: .infinity, minHeight: 600, idealHeight: 900, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
     }
 }

@@ -1,0 +1,284 @@
+{
+  "methodVersion": 1,
+  "archiveChecksum": "ef0377d8798287532a1d3f988914add823f5fd9c4b15f634dec00a2a8c877004",
+  "objective": "Probability of matching the best source pivot by next-draw ending coverage; ties count.",
+  "evaluation": "Sequential forecasts use only completed earlier pairs. Fixed pattern blend; promotion requires positive lower 95% paired intervals for both Brier improvement and size-adjusted coverage. Last 240 validation pairs.",
+  "caveat": "Estimates describe a pivot-pool ranking event, not the chance of winning a ticket. Approximate paired intervals do not establish lottery predictability.",
+  "estimate": {
+    "version": 1,
+    "sourceDate": "2026-08-29",
+    "sourceNumbers": [
+      10,
+      17,
+      32,
+      37,
+      38
+    ],
+    "historyStart": "2024-03-03",
+    "historyDraws": 910,
+    "completedPairs": 909,
+    "poolNumbers": [
+      2,
+      4,
+      5,
+      8,
+      9,
+      10,
+      12,
+      14,
+      15,
+      18,
+      19,
+      20,
+      22,
+      24,
+      25,
+      28,
+      29,
+      30,
+      32,
+      34,
+      35,
+      38,
+      39,
+      40,
+      42
+    ],
+    "pivots": [
+      2
+    ],
+    "method": "historical-baseline",
+    "validation": {
+      "trials": 240,
+      "from": "2026-01-02",
+      "through": "2026-08-29",
+      "patternsPromoted": false,
+      "pairPromoted": false,
+      "brierGain": {
+        "mean": -0.00036986427715695816,
+        "lower": -0.002643646291654929,
+        "upper": 0.0019039177373410127
+      },
+      "coverageGain": {
+        "mean": 0.008333333333333333,
+        "lower": -0.060128545283915286,
+        "upper": 0.07679521195058195
+      },
+      "pairTrials": 20,
+      "pairGain": {
+        "mean": 0.026190476190476097,
+        "lower": -0.3566902940377064,
+        "upper": 0.4090712464186586
+      },
+      "baselineBrier": 0.2215956397541112,
+      "patternBrier": 0.22196550403126822,
+      "baselineWinRate": 0.625,
+      "patternWinRate": 0.6375,
+      "highWinRate": 0.5333333333333333
+    },
+    "reason": "Patterns have not shown a reliable advantage; using the historical pool-size estimate.",
+    "candidates": [
+      {
+        "digit": 2,
+        "probability": 0.5767633273634875,
+        "patternProbability": 0.5153687145948828,
+        "baselineProbability": 0.5767633273634875,
+        "poolSize": 25,
+        "trials": 302,
+        "evidence": [
+          {
+            "key": "digit:2",
+            "probability": 0.4127753987247035,
+            "trials": 402
+          },
+          {
+            "key": "role:middle:copies:1",
+            "probability": 0.318538781112434,
+            "trials": 1699
+          },
+          {
+            "key": "transition:8:2",
+            "probability": 0.5244058155767946,
+            "trials": 31
+          },
+          {
+            "key": "lag2:1:2",
+            "probability": 0.45504833034841036,
+            "trials": 24
+          },
+          {
+            "key": "loop:1>8:2",
+            "probability": 0.5936927942689479,
+            "trials": 1
+          },
+          {
+            "key": "return:2:7+",
+            "probability": 0.41938349092637855,
+            "trials": 102
+          }
+        ]
+      },
+      {
+        "digit": 8,
+        "probability": 0.5767633273634875,
+        "patternProbability": 0.5440278608430485,
+        "baselineProbability": 0.5767633273634875,
+        "poolSize": 25,
+        "trials": 302,
+        "evidence": [
+          {
+            "key": "digit:8",
+            "probability": 0.4789350848095467,
+            "trials": 387
+          },
+          {
+            "key": "role:high:copies:1",
+            "probability": 0.4731945742775581,
+            "trials": 728
+          },
+          {
+            "key": "transition:8:8",
+            "probability": 0.5200552346838976,
+            "trials": 18
+          },
+          {
+            "key": "lag2:1:8",
+            "probability": 0.5263199971906607,
+            "trials": 27
+          },
+          {
+            "key": "loop:1>8:8",
+            "probability": 0.5708584560278346,
+            "trials": 2
+          },
+          {
+            "key": "return:8:0",
+            "probability": 0.49839101894616017,
+            "trials": 74
+          }
+        ]
+      },
+      {
+        "digit": 7,
+        "probability": 0.44710213483608247,
+        "patternProbability": 0.4544980972426026,
+        "baselineProbability": 0.44710213483608247,
+        "poolSize": 24,
+        "trials": 278,
+        "evidence": [
+          {
+            "key": "digit:7",
+            "probability": 0.4479683440095,
+            "trials": 404
+          },
+          {
+            "key": "role:middle:copies:2",
+            "probability": 0.6093624640129903,
+            "trials": 289
+          },
+          {
+            "key": "transition:8:7",
+            "probability": 0.4026622701237955,
+            "trials": 25
+          },
+          {
+            "key": "lag2:1:7",
+            "probability": 0.40718372252317353,
+            "trials": 22
+          },
+          {
+            "key": "loop:1>8:7",
+            "probability": 0.4344611568913326,
+            "trials": 3
+          },
+          {
+            "key": "return:7:4-6",
+            "probability": 0.46972640033394425,
+            "trials": 84
+          }
+        ]
+      },
+      {
+        "digit": 0,
+        "probability": 0.22626980274480385,
+        "patternProbability": 0.2698353299887857,
+        "baselineProbability": 0.22626980274480385,
+        "poolSize": 17,
+        "trials": 234,
+        "evidence": [
+          {
+            "key": "digit:0",
+            "probability": 0.3841236044305194,
+            "trials": 352
+          },
+          {
+            "key": "role:low:copies:1",
+            "probability": 0.36259427914823206,
+            "trials": 697
+          },
+          {
+            "key": "transition:8:0",
+            "probability": 0.2959636968065546,
+            "trials": 18
+          },
+          {
+            "key": "lag2:1:0",
+            "probability": 0.27022772317120203,
+            "trials": 22
+          },
+          {
+            "key": "loop:1>8:0",
+            "probability": 0.23816575058797382,
+            "trials": 3
+          },
+          {
+            "key": "return:0:3",
+            "probability": 0.32933008925212365,
+            "trials": 35
+          }
+        ]
+      }
+    ],
+    "recentWinners": [
+      [
+        3
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        0,
+        3,
+        6,
+        7,
+        8
+      ],
+      [
+        0
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        1
+      ],
+      [
+        8
+      ]
+    ]
+  },
+  "pool": [
+    0,
+    2,
+    4,
+    5,
+    8,
+    9
+  ]
+}

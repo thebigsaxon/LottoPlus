@@ -132,7 +132,7 @@ test('a pool under 3 digits does not invent Quick Picks', () => {
   });
   assert.equal(composed.available, false);
   assert.ok(composed.lines.every(line => line.available === false && line.numbers.length === 0));
-  assert.match(composed.unavailableReason, /under 3/);
+  assert.match(composed.unavailableReason, /at least 3/);
 });
 
 test('composer is deterministic for a fixed source row and settings', () => {
@@ -145,4 +145,70 @@ test('system line labels prefer Core/Spread/Guard from analyzer 10', () => {
   assert.equal(systemLineLabel({ role: 'core', rank: 1 }, 10), 'Core');
   assert.equal(systemLineLabel({ rank: 2 }, 10), 'Spread');
   assert.equal(systemLineLabel({ rank: 1 }, 9), 'System A');
+});
+
+function composeDigits(digits, support = {}) {
+  return composePoolLines({
+    combined: { digits },
+    pool: { equations: Object.entries(support).flatMap(([digit, count]) =>
+      Array.from({ length: count }, () => ({ result: Number(digit), operation: 'add', explanation: `equation for ${digit}` }))) }
+  });
+}
+
+test('the screenshot pool produces spaced lines with visible role labels', () => {
+  const result = composeDigits([0, 3, 4, 6, 7, 8]);
+  assert.deepEqual(result.lines.map(line => line.label), ['Core', 'Spread', 'Guard']);
+  result.lines.forEach(line => {
+    assert.ok(line.numbers.at(-1) - line.numbers[0] >= 25);
+    assert.ok(new Set(line.numbers.map(number => Math.floor(number / 10))).size >= 4);
+    assert.ok(line.positions.every(position => !/strongest tell|less support|undefined/.test(position.reason)));
+  });
+});
+
+test('Core favors equation support without letting one ending dominate', () => {
+  const result = composeDigits([0, 3, 4, 6, 7, 8], { 8: 20, 7: 4, 6: 3, 4: 2, 3: 1 });
+  assert.deepEqual([...result.lines[0].digits].sort((a, b) => a - b), [3, 4, 6, 7, 8]);
+  const tight = composeDigits([2, 7, 8], { 8: 20 });
+  assert.equal(tight.lines[0].digits.filter(digit => digit === 8).length, 2);
+  assert.equal(new Set(tight.lines[0].digits).size, 3);
+});
+
+test('Spread maximizes available tens coverage after Core consumes numbers', () => {
+  const result = composeDigits([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  const core = result.lines[0].numbers;
+  const remaining = Array.from({ length: 42 }, (_, i) => i + 1).filter(number => !core.includes(number));
+  const availableBands = new Set(remaining.map(number => Math.floor(number / 10))).size;
+  assert.equal(new Set(result.lines[1].numbers.map(number => Math.floor(number / 10))).size, Math.min(5, availableBands));
+});
+
+test('Guard covers omitted endings and balances total coverage', () => {
+  const result = composeDigits([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], { 0: 10, 1: 9, 2: 8, 3: 7, 4: 6 });
+  const before = result.lines.slice(0, 2).flatMap(line => line.digits);
+  const omitted = Array.from({ length: 10 }, (_, digit) => digit).filter(digit => !before.includes(digit));
+  assert.ok(omitted.every(digit => result.lines[2].digits.includes(digit)));
+  const counts = Array(10).fill(0);
+  result.selected.forEach(number => { counts[number % 10] += 1; });
+  assert.equal(Math.max(...counts) - Math.min(...counts), 1);
+});
+
+test('previous draw numbers remain equally eligible in the composer', () => {
+  const workbench = { combined: { digits: [0, 3, 4, 6, 7, 8] }, pool: { equations: [] } };
+  const original = composePoolLines(workbench);
+  const withPrevious = composePoolLines({ ...workbench, source: { numbers: original.lines[0].numbers } });
+  assert.deepEqual(withPrevious.lines, original.lines);
+});
+
+test('narrow pools report their capacity without storing discarded partial tickets', () => {
+  const result = composeDigits([2, 7, 8]);
+  assert.equal(result.matrixSize, 13);
+  assert.equal(result.lines[2].available, false);
+  assert.match(result.lines[2].unavailableReason, /13 eligible numbers; 3 remain unused/);
+  assert.deepEqual(result.selected, result.lines.flatMap(line => line.numbers));
+});
+
+test('composer uses the same cleaned pool as the displayed full numbers', () => {
+  const clean = composeDigits([0, 2, 8]);
+  const dirty = composeDigits([8, '2', 0, '0', 8, NaN, 10, -1, null, '']);
+  assert.deepEqual(dirty.pool, clean.pool);
+  assert.deepEqual(dirty.lines, clean.lines);
 });

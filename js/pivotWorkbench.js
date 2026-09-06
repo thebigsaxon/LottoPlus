@@ -1,3 +1,6 @@
+import { analyzeAutomaticPivot, buildAutomaticPool, cleanPivotHistory, AUTO_PIVOT_VERSION } from './automaticPivot.js?v=1';
+import { AUTOMATIC_PIVOT_ARCHIVE } from './automaticPivotArchive.js?v=1';
+
 /** Prospective 0–9 pivot workbench. History overlays stay in pivotPools.js. */
 
 export const PIVOT_OPERATORS = Object.freeze({
@@ -7,6 +10,7 @@ export const PIVOT_OPERATORS = Object.freeze({
 });
 
 export const PIVOT_CHOOSERS = Object.freeze({
+  AUTO: 'auto',
   MANUAL: 'manual',
   HIGH: 'high',
   LOW: 'low',
@@ -21,7 +25,8 @@ export const WORKBENCH_METHOD_VERSION = 2;
 
 export const DEFAULT_WORKBENCH_SETTINGS = Object.freeze({
   methodVersion: WORKBENCH_METHOD_VERSION,
-  chooser: PIVOT_CHOOSERS.HIGH,
+  automationVersion: AUTO_PIVOT_VERSION,
+  chooser: PIVOT_CHOOSERS.AUTO,
   selectedPivots: Object.freeze([]),
   operators: Object.freeze({
     add: true,
@@ -76,12 +81,13 @@ export function normalizeWorkbenchSettings(settings = {}) {
     .slice(0, MAX_MANUAL_PIVOTS);
   const recencyDraws = 0;
   const recencyLimit = 6;
-  const chooser = Object.values(PIVOT_CHOOSERS).includes(source.chooser) ? source.chooser : PIVOT_CHOOSERS.HIGH;
+  const chooser = Object.values(PIVOT_CHOOSERS).includes(source.chooser) ? source.chooser : PIVOT_CHOOSERS.AUTO;
   const disabledEquations = [...new Set((Array.isArray(source.disabledEquations) ? source.disabledEquations : [])
     .map(value => String(value)))];
   const migrated = Number(source.methodVersion) >= WORKBENCH_METHOD_VERSION;
   return {
     methodVersion: WORKBENCH_METHOD_VERSION,
+    automationVersion: Math.max(0, Number(source.automationVersion) || 0),
     chooser,
     selectedPivots: selected,
     operators: migrated
@@ -97,6 +103,17 @@ export function normalizeWorkbenchSettings(settings = {}) {
     recencyLimit,
     disabledEquations
   };
+}
+
+export function migrateLiveWorkbenchSettings(settings = {}) {
+  return normalizeWorkbenchSettings({ ...settings,
+    ...(Number(settings?.automationVersion) >= AUTO_PIVOT_VERSION ? {} : { chooser: PIVOT_CHOOSERS.AUTO }),
+    automationVersion: AUTO_PIVOT_VERSION });
+}
+
+/** The archive is clipped before analysis, including when replaying an old drawing. */
+export function automaticSelectionForDraw(draws, sourceDate) {
+  return analyzeAutomaticPivot(cleanPivotHistory([...AUTOMATIC_PIVOT_ARCHIVE, ...draws], sourceDate));
 }
 
 export function equationKey(item = {}) {
@@ -328,7 +345,11 @@ export function scorePoolAgainstDigits(pool = [], targetDigits = []) {
 }
 
 export function fullNumbersForPool(pool = []) {
-  return [...new Set(pool)].sort((left, right) => left - right).map(digit => ({
+  const digits = (Array.isArray(pool) ? pool : [])
+    .filter(value => typeof value === 'number' || (typeof value === 'string' && value.trim() !== ''))
+    .map(Number)
+    .filter(digit => Number.isInteger(digit) && digit >= 0 && digit <= 9);
+  return [...new Set(digits)].sort((left, right) => left - right).map(digit => ({
     digit,
     numbers: Array.from({ length: 42 }, (_, index) => index + 1).filter(number => number % 10 === digit)
   }));
@@ -345,14 +366,16 @@ export function evaluateWorkbenchHistory(draws = [], recipe = {}) {
   for (let target = 1; target < official.length; target += 1) {
     const source = official[target - 1];
     const previous = target >= 2 ? official[target - 2] : null;
-    const pivots = choosePivots(source.numbers, settings.chooser === PIVOT_CHOOSERS.MANUAL
+    const automatic = settings.chooser === PIVOT_CHOOSERS.AUTO
+      ? automaticSelectionForDraw(official.slice(0, target), source.date) : null;
+    const pivots = automatic?.pivots || choosePivots(source.numbers, settings.chooser === PIVOT_CHOOSERS.MANUAL
       ? PIVOT_CHOOSERS.TIGHTEST
       : settings.chooser, {
       ...settings,
       previousNumbers: previous?.numbers
     });
     if (!pivots.length) continue;
-    const generated = buildDigitPool(source.numbers, pivots, settings);
+    const generated = automatic ? buildAutomaticPool(source.numbers, pivots) : buildDigitPool(source.numbers, pivots, settings);
     let digits = generated.digits;
     if (settings.recencyDraws > 0) {
       const recency = newestUniqueEndings(official, {
@@ -376,6 +399,9 @@ export function evaluateWorkbenchHistory(draws = [], recipe = {}) {
   const mean = (key) => (count ? records.reduce((sum, item) => sum + item[key], 0) / count : 0);
   return {
     draws: count,
+    evaluatedChooser: settings.chooser === PIVOT_CHOOSERS.MANUAL ? PIVOT_CHOOSERS.TIGHTEST : settings.chooser,
+    excludesManualPivots: settings.chooser === PIVOT_CHOOSERS.MANUAL,
+    excludesEquationEdits: normalizeWorkbenchSettings(recipe).disabledEquations.length > 0,
     meanWidth: mean('width'),
     meanHits: mean('hits'),
     meanExpected: mean('expected'),
@@ -386,7 +412,7 @@ export function evaluateWorkbenchHistory(draws = [], recipe = {}) {
 }
 
 export function buildPivotWorkbench(draws = [], settings = {}) {
-  const official = officialDraws(draws);
+  const official = cleanPivotHistory(draws);
   const normalized = normalizeWorkbenchSettings(settings);
   const source = official.at(-1) || null;
   const previous = official.at(-2) || null;
@@ -401,20 +427,25 @@ export function buildPivotWorkbench(draws = [], settings = {}) {
       recency: { digits: [], applied: false, tooNarrow: false },
       combined: { digits: [], width: 0, expected: 0, tooNarrow: false },
       history: evaluateWorkbenchHistory([], normalized),
-      fullNumbers: []
+      fullNumbers: [],
+      eligibleNumbers: []
     };
   }
 
+  const automaticSelection = normalized.chooser === PIVOT_CHOOSERS.AUTO
+    ? automaticSelectionForDraw(official, source.date) : null;
   const endings = officialEndingRow(source);
   const candidates = listCandidatePivots(endings).map(item => {
-    const pool = buildDigitPool(source.numbers, [item.digit], { ...normalized, disabledEquations: [] });
+    const pool = automaticSelection ? buildAutomaticPool(source.numbers, [item.digit])
+      : buildDigitPool(source.numbers, [item.digit], { ...normalized, disabledEquations: [] });
     return { ...item, poolWidth: pool.width, poolDigits: pool.digits };
   });
-  const activePivots = choosePivots(source.numbers, normalized.chooser, {
+  const activePivots = automaticSelection?.pivots || choosePivots(source.numbers, normalized.chooser, {
     ...normalized,
     previousNumbers: previous?.numbers
   });
-  const generated = buildDigitPool(source.numbers, activePivots, normalized);
+  const generated = automaticSelection ? buildAutomaticPool(source.numbers, activePivots)
+    : buildDigitPool(source.numbers, activePivots, normalized);
   const recencyDigits = normalized.recencyDraws > 0
     ? newestUniqueEndings(official, {
       throughIndex: official.length - 1,
@@ -426,6 +457,7 @@ export function buildPivotWorkbench(draws = [], settings = {}) {
   const combinedDigits = intersection.applied ? intersection.digits : generated.digits;
   const tooNarrow = combinedDigits.length > 0 && combinedDigits.length < NARROW_POOL_WARNING;
 
+  const fullNumbers = fullNumbersForPool(combinedDigits);
   return {
     valid: generated.valid || combinedDigits.length > 0,
     settings: normalized,
@@ -440,6 +472,7 @@ export function buildPivotWorkbench(draws = [], settings = {}) {
       : null,
     candidates,
     activePivots,
+    automaticSelection,
     pool: generated,
     recency: { digits: recencyDigits, ...intersection },
     combined: {
@@ -447,10 +480,12 @@ export function buildPivotWorkbench(draws = [], settings = {}) {
       width: combinedDigits.length,
       expected: expectedEndingHits(combinedDigits),
       tooNarrow,
-      edited: normalized.disabledEquations.length > 0
+      edited: !automaticSelection && normalized.disabledEquations.length > 0
     },
-    history: evaluateWorkbenchHistory(official, normalized),
-    fullNumbers: fullNumbersForPool(combinedDigits)
+    history: automaticSelection ? { evaluatedChooser: PIVOT_CHOOSERS.AUTO, ...automaticSelection.validation }
+      : evaluateWorkbenchHistory(official, normalized),
+    fullNumbers,
+    eligibleNumbers: fullNumbers.flatMap(item => item.numbers).sort((left, right) => left - right)
   };
 }
 

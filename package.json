@@ -8,7 +8,8 @@
     "build:archive": "node scripts/build_cash5_archive.js",
     "evaluate:v6": "node scripts/evaluate_v6.js",
     "evaluate:v7": "node scripts/evaluate_v7_endings.js",
-    "evaluate:v9": "node scripts/evaluate_v9.js"
+    "evaluate:v9": "node scripts/evaluate_v9.js",
+    "evaluate:pivot": "node scripts/evaluate_auto_pivot.js"
   },
   "keywords": [
     "lottery",

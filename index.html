@@ -15,7 +15,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="css/styles.css?v=46">
+  <link rel="stylesheet" href="css/styles.css?v=51">
 </head>
 <body>
   <header class="app-toolbar">
@@ -141,69 +141,69 @@
       </article>
 
       <article class="surface next-board-surface future-map-card" id="futureMapCard">
-        <header class="surface-header">
-          <div><span class="eyebrow">Plan by position</span><h2>Next Draw Board</h2></div>
-          <div class="surface-actions"><button class="text-btn" id="btnClearFutureMap" type="button">Clear board</button><button class="btn btn-secondary" id="btnJumpToSlip" type="button">Your pick ↓</button></div>
-        </header>
-        <p class="surface-intro" id="nextDrawIntro">Steer the ending pool, then let the app play Core, Spread, and Guard from that tell so one favourite digit cannot eat the slip.</p>
-        <details class="board-guide" id="nextDrawGuide">
-          <summary>How to use this board</summary>
-          <div class="board-guide-body">
-            <p>Two jobs, in this order: you shrink 0–9 from the latest official row, then the app turns that tell into tickets so one favourite digit cannot eat the slip. Cash 5 still pays on five whole numbers. Tens are only 0–4. The real work here is the ones digits.</p>
-            <h3>Ending pool</h3>
-            <p><strong>Source</strong> is last night’s endings. Example: 15 25 28 30 38 shows as 5 5 8 0 8. That is the input. Nothing here has seen tomorrow.</p>
-            <p><strong>Chooser</strong> picks which digit is the pivot:</p>
-            <ul>
-              <li><strong>High</strong> — largest ending (8 in that row). Default.</li>
-              <li><strong>Low</strong> — smallest ending (0).</li>
-              <li><strong>Tightest</strong> — try every unique digit and keep the one whose math makes the smallest pool.</li>
-              <li><strong>0 + alternate</strong> — if 0 is on the row, use 0 plus a partner (often a digit the previous pivot produced, like 2 from 10 − 8). 0 alone just copies the row.</li>
-              <li><strong>Manual</strong> — click 1–2 of the digit cards yourself.</li>
-            </ul>
-            <p>Each digit card is a unique ending on that row. Click one or two to set the pivot. The pool is <strong>pivot ± every other ending</strong> on last night’s row, using the ones digit. Example: high 9 against 6, 7, and 8 is 9±6=3/5, 9±7=2/6, 9±8=1/7, so the pool is 1 2 3 5 6 7. The pivot itself is not added unless an equation produces it. A chip with an amber ring was also on the source row, so it can repeat. The lists of 06 · 16 · 26 · 36 are the full Cash 5 numbers those endings allow.</p>
-            <p>Equations and extra operator toggles live under <strong>Reference</strong> if you want the work shown.</p>
-            <h3>Core, Spread, Guard</h3>
-            <p>These three system lines rebuild whenever the pool changes. They are not Quick Picks and not quality ranks.</p>
-            <ul>
-              <li><strong>Core</strong> plays the strongest tell first (endings with the most live equations, including the pivot).</li>
-              <li><strong>Spread</strong> uses the same pool, different tens, no repeated numbers.</li>
-              <li><strong>Guard</strong> plays pool digits you are likely to ignore when you lock onto one number. Still inside the pool.</li>
-            </ul>
-            <p>The small digit under each number is the ending. Hover or click a number for the why, such as “17 · ending 7 from 15 − 8.” If you see a dash on Guard or Spread, the pool is so tight there are not 15 legal numbers. The app leaves the line blank rather than grabbing random 1–42. A 3-ending pool often only fills Core and Spread. That is honest.</p>
-            <p><strong>Show all digits</strong> is research (what historically followed this Ball’s ending). It does not pick tickets. <strong>Your pick</strong> below the board is an extra line if you want one. The three system lines are already the app’s answer.</p>
-            <h3>Whole-number themes</h3>
-            <p>Sometimes the picture is the complete numbers, not the 0–9 pool: a consecutive pair sliding for several draws, a high cluster like 36–39, an exact number coming back under a new identity. When that stacks, the board flashes <strong>Whole-number theme live</strong>, highlights those numbers in Draw History, and offers a theme line you can drop into Your pick. That is a shape alert, not a jackpot claim. Watch the complete numbers when it fires.</p>
-            <h3>Tonight</h3>
-            <ol>
-              <li>Look at Source. That is last night’s endings.</li>
-              <li>Start with High, or click the digit you actually see as the pivot.</li>
-              <li>Read Pool. Those endings, and the full numbers under them, are the tell.</li>
-              <li>Stop. Do not hunt for a prettier 8. That is the “too focused” failure.</li>
-              <li>Read Core / Spread / Guard. Those are the three slips. Click any number for the why.</li>
-              <li>Save for the next draw when you are done. Changing the pool updates pending system lines; scored old sessions stay frozen.</li>
-            </ol>
+        <section class="pivot-workbench" id="pivotWorkbench" aria-label="Ending pool workbench">
+          <div class="next-draw-tabs" role="tablist" aria-label="Next Draw system">
+            <button type="button" class="next-draw-tab active" id="pivotTab" data-next-draw-tab="pivot" role="tab" aria-selected="true" aria-controls="pivotTabPanel">Pivot number system</button>
+            <button type="button" class="next-draw-tab" id="manualTab" data-next-draw-tab="manual" role="tab" aria-selected="false" aria-controls="manualTabPanel">Manual draw</button>
           </div>
-        </details>
-        <section class="pivot-workbench" id="pivotWorkbench" aria-label="Ending pool workbench"></section>
-        <div class="next-draw-tracks" id="nextDrawTracks" aria-label="Next draw evidence tracks" hidden></div>
-          <div class="future-map-legend" aria-label="Next draw board legend">
-            <span><i class="intuition"></i>Mapped selection</span>
-            <span><i class="successor-rank-1"></i>#1</span>
-            <span><i class="successor-rank-2"></i>#2</span>
-            <span><i class="successor-rank-3"></i>#3</span>
+          <div id="pivotTabPanel" class="next-draw-tab-panel" role="tabpanel" aria-labelledby="pivotTab">
+            <div id="pivotNumberPool" aria-live="polite"></div>
+            <details class="board-options" id="nextDrawOptions">
+              <summary>Pivot options</summary>
+              <div id="pivotControls"></div>
+              <div class="surface-actions pool-actions"><button class="btn btn-secondary" id="btnClearFutureMap" data-clear-future-map type="button" title="Clear mapped selections and your unsaved extra pick. Generated lines and saved sessions stay in place.">Clear selections &amp; pick</button><button class="btn btn-secondary" id="btnJumpToSlip" data-jump-to-slip type="button">Your pick ↓</button></div>
+              <details class="board-guide" id="nextDrawGuide">
+                <summary>How to use this board</summary>
+                <div class="board-guide-body">
+                <h3>Build an ending pool</h3>
+                <p>Source shows the latest official draw’s ones digits. Automatic reviews previous winning pivots, transitions, loops, recurrence, and pool size, then chooses the pivot and builds the pool for you. Only results available before the next drawing are used.</p>
+                <p>Automatic uses the same arithmetic as Winning Pivot: the ones digit of addition and borrowed subtraction against every other source ball, including repeated endings. Pattern choices must improve prior validation forecasts; otherwise the historical pool-size estimate is used. A second pivot needs separate evidence that its extra coverage is useful.</p>
+                <p>The pool shows each eligible number from 1–42 once. Options contains the estimates and optional manual overrides. Tap pool numbers and save to track your own subset; automatic decisions are also recorded with the drawing.</p>
+                <h3>Core, Spread, and Guard</h3>
+                <ul>
+                  <li><strong>Core</strong> first favors distinct endings and limits concentration, then favors endings produced by more equations.</li>
+                  <li><strong>Spread</strong> uses unused numbers to cover as many tens ranges as possible, favoring ranges not yet covered.</li>
+                  <li><strong>Guard</strong> uses unused numbers to balance total ending appearances across all three lines.</li>
+                </ul>
+                <p>Each line uses spacing across 1–42 to break remaining ties. Numbers from the previous draw remain eligible. Lines are sorted, stay inside the pool, and share no full numbers. These are construction rules, not confidence ranks or demonstrated predictive advantages.</p>
+                <p>At least three endings are required. If fewer than five unused numbers remain, the next line stays empty. Hover over a number for its equation and construction rule; click it to select it for inspection. Ball 1–5 are the sorted positions in each ticket.</p>
+                <h3>Selections and saving</h3>
+                <p>Show all digits opens historical successor research; its colors do not rank the system lines. Your pick is an optional extra line. Clear selections &amp; pick clears mapped highlights and the unsaved extra pick; generated lines and saved sessions remain.</p>
+                <p>Changing the pool rebuilds pending system lines. Save for next draw stores your extra rows alongside them. Scored sessions stay frozen.</p>
+                <h3>Whole-number themes</h3>
+                <p>Whole-number theme alerts in Draw History show complete-number patterns and can supply an extra line to Your pick. They do not change these three pool-based lines.</p>
+                </div>
+              </details>
+              <div class="next-draw-tracks" id="nextDrawTracks" aria-label="Next draw evidence tracks" hidden></div>
+              <details class="system-lines-disclosure">
+                <summary>System lines</summary>
+                <div class="board-line-guide" aria-label="System line construction rules">
+                  <span><strong>Core</strong> Equation support</span>
+                  <span><strong>Spread</strong> Tens coverage</span>
+                  <span><strong>Guard</strong> Ending balance</span>
+                </div>
+                <p class="board-help">Construction rules, not confidence ranks. Numbers are unique across lines; small digits show endings.</p>
+                <div class="future-map-legend" aria-label="Next draw board selection legend"><span><i class="intuition"></i>Selected ending at this position</span></div>
+                <div id="futureDigitGrid" class="future-digit-grid"></div>
+              </details>
+            </details>
           </div>
-        <div id="futureDigitGrid" class="future-digit-grid"></div>
-        <details class="all-digits-disclosure" id="allDigitsDisclosure">
-          <summary>Show all digits</summary>
-          <p>Historical successor colors show which endings followed the latest digit in the same Ball position.</p>
-          <div class="future-map-legend compact" aria-label="Historical successor legend">
-            <span><i class="successor-rank-1"></i>#1</span>
-            <span><i class="successor-rank-2"></i>#2</span>
-            <span><i class="successor-rank-3"></i>#3</span>
-            <span><i class="successor-rank-4"></i>Honorable mention</span>
+          <div id="manualTabPanel" class="next-draw-tab-panel" role="tabpanel" aria-labelledby="manualTab" hidden>
+            <p class="board-help manual-draw-intro">Choose the ending digit for each Ball directly. The mapped choices feed the Next drawing preview and Your pick while leaving the Pivot number system unchanged.</p>
+            <div class="surface-actions pool-actions manual-draw-actions"><button class="btn btn-secondary" data-clear-future-map type="button">Clear selections &amp; pick</button><button class="btn btn-secondary" data-jump-to-slip type="button">Your pick ↓</button></div>
+            <details class="all-digits-disclosure" id="allDigitsDisclosure" open>
+              <summary>Show all digits</summary>
+              <p>Historical successor colors show which endings followed the latest digit in the same Ball position.</p>
+              <div class="future-map-legend compact" aria-label="Historical successor legend">
+                <span><i class="successor-rank-1"></i>#1</span>
+                <span><i class="successor-rank-2"></i>#2</span>
+                <span><i class="successor-rank-3"></i>#3</span>
+                <span><i class="successor-rank-4"></i>Honorable mention</span>
+              </div>
+              <div id="futureAllDigitGrid" class="future-digit-grid all-digit-grid"></div>
+            </details>
           </div>
-          <div id="futureAllDigitGrid" class="future-digit-grid all-digit-grid"></div>
-        </details>
+        </section>
       </article>
     </section>
 
@@ -212,7 +212,7 @@
         <div><span class="eyebrow">Your extra line</span><h2 id="userPickTitle">Your pick</h2></div>
         <div class="slip-progress" id="slipProgress">0 of 5 selected</div>
       </header>
-      <p class="slip-intro">The three system lines on the Next Draw Board are already saved with the session. Use this only for an extra user line. For each ball, optionally set a tens range, then choose a full number. Unavailable ranges stay disabled when mapped endings, chosen numbers, or the 1–42 limit would prevent an increasing row.</p>
+      <p class="slip-intro">The three system lines under Next Draw Board → Options are already saved with the session. Use this only for an extra user line. For each ball, optionally set a tens range, then choose a full number. Unavailable ranges stay disabled when mapped endings, chosen numbers, or the 1–42 limit would prevent an increasing row.</p>
       <div class="slip-builder" id="rowBuilder"></div>
       <div class="slip-action-bar">
         <p id="slipGuidance">Start with any ball. You can change every choice before saving the row.</p>
@@ -225,7 +225,7 @@
 
     <section class="analysis-panels" aria-label="Detailed analysis">
       <details class="surface disclosure optional-tool">
-        <summary><span><small>Optional research tool</small><strong>Study Similar Sequences</strong></span><span class="summary-action">Open</span></summary>
+        <summary><span><small>Optional research tool</small><strong>Study Similar Sequences</strong></span><span class="summary-action"><span class="summary-open">Open</span><span class="summary-close">Collapse</span></span></summary>
         <div class="disclosure-body motif-layout">
           <div class="motif-controls">
             <p>This searches up to the latest 50 loaded drawings using the digits you mapped by Ball. It finds older draws with similar position endings, then shows the drawing that immediately followed each one.</p>
@@ -240,7 +240,7 @@
       </details>
 
       <details class="surface disclosure optional-tool">
-        <summary><span><small>Optional research tool</small><strong>Inspect Number Evidence</strong></span><span class="summary-action">Open</span></summary>
+        <summary><span><small>Optional research tool</small><strong>Inspect Number Evidence</strong></span><span class="summary-action"><span class="summary-open">Open</span><span class="summary-close">Collapse</span></span></summary>
         <div class="disclosure-body evidence-layout">
           <div class="candidate-overview">
             <p class="optional-explainer">Your five mapped Ball positions drive this panel. Hot, warm, and cold colors summarize up to the latest 50 loaded drawings; they are context, not additional selections or predictions.</p>
@@ -255,7 +255,7 @@
       </details>
 
       <details class="surface disclosure optional-tool" id="historicalPerformanceCard">
-        <summary><span><small>Optional outcome analysis</small><strong>Historical Performance</strong></span><span class="summary-action">Open</span></summary>
+        <summary><span><small>Optional outcome analysis</small><strong>Historical Performance</strong></span><span class="summary-action"><span class="summary-open">Open</span><span class="summary-close">Collapse</span></span></summary>
         <div class="disclosure-body performance-analysis" id="historicalPerformance">
           <div class="empty-state">Scored saved sessions will appear here.</div>
         </div>
@@ -278,6 +278,6 @@
   </aside>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  <script type="module" src="js/app.js?v=59"></script>
+  <script type="module" src="js/app.js?v=63"></script>
 </body>
 </html>

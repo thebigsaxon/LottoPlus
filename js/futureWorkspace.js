@@ -126,15 +126,28 @@ function previewNumbersFromDigitMap(values = []) {
   return numbers;
 }
 
+function previewNumbersFromPoolDraft(draft, baselineDate = '') {
+  if (!draft || (baselineDate && draft.baselineDate !== baselineDate)) return null;
+  const selected = [...new Set((Array.isArray(draft.selectedNumbers) ? draft.selectedNumbers : [])
+    .map(Number)
+    .filter(number => Number.isInteger(number) && number >= 1 && number <= 42))]
+    .sort((a, b) => a - b);
+  if (!selected.length) return null;
+  return Array.from({ length: 5 }, (_, column) => selected[column] ?? null);
+}
+
 /**
  * Select the line that should be shown in the Next drawing history row.
- * The full-number composer wins while it is being edited. Ending-digit and
- * system-cell selections have independent preview state, followed by saved
- * user rows when no live selection exists.
+ * The full-number composer wins while it is being edited. Pool picks then
+ * provide a sorted full-number preview, followed by ending-digit and
+ * system-cell selections and saved user rows when no live selection exists.
  */
 export function nextDrawingPreviewNumbers(workspace = {}, baselineDate = '') {
   const active = positionNumbers(workspace.slipNumbers);
   if (active.some(Number.isInteger)) return active;
+
+  const pool = previewNumbersFromPoolDraft(workspace.poolPickDraft, baselineDate);
+  if (pool) return pool;
 
   const mapped = previewNumbersFromDigitMap(workspace.futureDigitMap);
   if (mapped) return mapped;

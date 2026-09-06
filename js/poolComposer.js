@@ -1,4 +1,5 @@
 /** Compose Core / Spread / Guard tickets from a workbench 0–9 pool. */
+import { fullNumbersForPool } from './pivotWorkbench.js?v=4';
 
 export const LINE_ROLES = Object.freeze(['core', 'spread', 'guard']);
 export const LINE_LABELS = Object.freeze({
@@ -37,64 +38,61 @@ export function rankPoolEndings(pool = [], equations = []) {
   return [...pool].sort((left, right) => (support.get(right) || 0) - (support.get(left) || 0) || left - right);
 }
 
-function numbersForEnding(digit) {
-  return Array.from({ length: 42 }, (_, index) => index + 1).filter(number => number % 10 === digit);
-}
+export const LINE_DESCRIPTIONS = Object.freeze({
+  core: 'Favor endings with more equations; use distinct endings first.',
+  spread: 'Cover as many tens ranges as the remaining numbers allow.',
+  guard: 'Balance ending coverage across all three lines.'
+});
 
-function spreadOrderedNumbers(digit, avoid = new Set()) {
-  const all = numbersForEnding(digit);
-  const interleave = (list) => {
-    const buckets = [0, 1, 2, 3, 4].map(tens => list.filter(number => tensBand(number) === tens));
-    const ordered = [];
-    let safety = 0;
-    while (ordered.length < list.length && safety < 40) {
-      buckets.forEach(bucket => {
-        if (bucket.length) ordered.push(bucket.shift());
-      });
-      safety += 1;
+// Exhaustively compare valid five-number subsets of the remaining pool. The
+// maximum search is C(42, 5); ordinary ending pools are substantially smaller.
+// Role objectives are lexicographic, so spacing never overrides a line's job.
+function chooseLine(available, role, support, usedEndingCounts, usedBands) {
+  if (available.length < 5) return [];
+  const endingCounts = Array(10).fill(0);
+  const bandCounts = Array(5).fill(0);
+  const chosen = [];
+  let best = [];
+  let bestScore = null;
+  function visit(start, distinctEndings, distinctBands, newBands, equationCount, coverageCost, repetitionCost, spacingCost) {
+    if (chosen.length === 5) {
+      const score = role === 'core'
+        ? [distinctEndings, -repetitionCost, equationCount, distinctBands, -spacingCost]
+        : role === 'spread'
+          ? [distinctBands, newBands, distinctEndings, -repetitionCost, -coverageCost, -spacingCost]
+          : [-coverageCost, distinctEndings, distinctBands, -spacingCost];
+      const difference = bestScore ? score.findIndex((value, i) => value !== bestScore[i]) : -1;
+      if (!bestScore || (difference >= 0 && score[difference] > bestScore[difference])) {
+        bestScore = score;
+        best = [...chosen];
+      }
+      return;
     }
-    return ordered;
-  };
-  return [
-    ...interleave(all.filter(number => !avoid.has(number))),
-    ...interleave(all.filter(number => avoid.has(number)))
-  ];
-}
-
-function reducedMatrix(pool) {
-  return pool.flatMap(digit => numbersForEnding(digit));
-}
-
-function pickFifteen(pool, equations, avoidNumbers) {
-  const ranked = rankPoolEndings(pool, equations);
-  const queues = new Map(ranked.map(digit => [digit, spreadOrderedNumbers(digit, avoidNumbers)]));
-  const selected = [];
-  let index = 0;
-  let stalled = 0;
-  while (selected.length < 15 && stalled < ranked.length) {
-    const digit = ranked[index % ranked.length];
-    index += 1;
-    const queue = queues.get(digit);
-    while (queue.length && selected.includes(queue[0])) queue.shift();
-    if (queue.length) {
-      selected.push(queue.shift());
-      stalled = 0;
-    } else {
-      stalled += 1;
+    const remaining = 5 - chosen.length;
+    // Centers of five equal intervals across 1–42, used only as a spacing tie-break.
+    const target = 1 + 41 * (chosen.length + 0.5) / 5;
+    for (let i = start; i <= available.length - remaining; i += 1) {
+      const number = available[i];
+      const digit = number % 10;
+      const band = tensBand(number);
+      const newEnding = endingCounts[digit] === 0;
+      const newBand = bandCounts[band] === 0;
+      endingCounts[digit] += 1;
+      bandCounts[band] += 1;
+      chosen.push(number);
+      visit(i + 1, distinctEndings + Number(newEnding), distinctBands + Number(newBand),
+        newBands + Number(newBand && !usedBands.has(band)),
+        equationCount + (support.get(digit) || 0),
+        coverageCost + 2 * (usedEndingCounts[digit] + endingCounts[digit]) - 1,
+        repetitionCost + 2 * endingCounts[digit] - 1,
+        spacingCost + (number - target) ** 2);
+      chosen.pop();
+      endingCounts[digit] -= 1;
+      bandCounts[band] -= 1;
     }
   }
-  return selected;
-}
-
-function dealLines(selected) {
-  const lines = LINE_ROLES.map(role => ({ role, label: LINE_LABELS[role], numbers: [] }));
-  let roleIndex = 0;
-  selected.forEach(number => {
-    while (roleIndex < lines.length && lines[roleIndex].numbers.length >= 5) roleIndex += 1;
-    if (roleIndex >= lines.length) return;
-    lines[roleIndex].numbers.push(number);
-  });
-  return lines;
+  visit(0, 0, 0, 0, 0, 0, 0, 0);
+  return best;
 }
 
 function endingClause(digit, equations = [], pivots = []) {
@@ -106,22 +104,10 @@ function endingClause(digit, equations = [], pivots = []) {
   return `ending ${digit} is in the pool`;
 }
 
-function roleClause(role, digit, mostSupported) {
-  if (role === 'core') {
-    return `Core plays the strongest tell (${mostSupported} had the most equations).`;
-  }
-  if (role === 'spread') {
-    return 'Spread covers the same pool with different tens.';
-  }
-  return digit === mostSupported
-    ? `Guard still stays inside the pool so the tell is not abandoned.`
-    : `Guard plays ${digit}, which had less support than ${mostSupported}.`;
-}
-
 export function reasonForNumber(number, role, context = {}) {
   const digit = Number(number) % 10;
   const ending = endingClause(digit, context.equations, context.pivots);
-  const roleText = roleClause(role, digit, context.mostSupported);
+  const roleText = LINE_DESCRIPTIONS[role] || '';
   const sorted = [...(context.lineNumbers || [])].sort((left, right) => left - right);
   const place = ballPlace(Math.max(0, sorted.indexOf(number)));
   return `${number} · ${ending}. ${roleText} ${tensPhrase(number)} for ${place}.`;
@@ -150,12 +136,12 @@ export function systemLineLabel(row, analyzerVersion = 10) {
 }
 
 export function composePoolLines(workbench = {}) {
-  const pool = [...new Set(workbench?.combined?.digits || [])].sort((left, right) => left - right);
+  const expanded = fullNumbersForPool(workbench?.combined?.digits);
+  const pool = expanded.map(item => item.digit);
   const equations = workbench?.pool?.equations || [];
   const pivots = workbench?.activePivots || [];
-  const sourceNumbers = new Set(workbench?.source?.numbers || []);
   const narrowReason = pool.length < NARROW_COMPOSE_POOL
-    ? 'Pool is under 3 digits, so the app will not invent tickets outside the tell.'
+    ? 'Choose at least 3 endings to build system lines. Numbers stay inside the pool.'
     : '';
   if (narrowReason) {
     return {
@@ -170,13 +156,25 @@ export function composePoolLines(workbench = {}) {
 
   const ranked = rankPoolEndings(pool, equations);
   const mostSupported = ranked[0];
-  const matrix = reducedMatrix(pool);
-  const selected = pickFifteen(pool, equations, sourceNumbers);
-  const dealt = dealLines(selected);
+  const matrix = expanded.flatMap(item => item.numbers).sort((left, right) => left - right);
+  const support = endingSupport(pool, equations);
+  const selected = [];
+  const usedEndingCounts = Array(10).fill(0);
+  const usedBands = new Set();
+  const dealt = LINE_ROLES.map(role => {
+    const used = new Set(selected);
+    const numbers = chooseLine(matrix.filter(number => !used.has(number)), role, support, usedEndingCounts, usedBands);
+    selected.push(...numbers);
+    numbers.forEach(number => {
+      usedEndingCounts[number % 10] += 1;
+      usedBands.add(tensBand(number));
+    });
+    return { role, label: LINE_LABELS[role], numbers };
+  });
   const lines = dealt.map((line, index) => {
     if (line.numbers.length < 5) {
       const reason = matrix.length < 15
-        ? `This pool has ${matrix.length} numbers. ${LINE_LABELS[line.role]} stays empty so every ticket stays inside the pool.`
+        ? `This pool has ${matrix.length} eligible numbers; ${matrix.length - selected.length} remain unused. ${LINE_LABELS[line.role]} needs 5 unused numbers.`
         : `${LINE_LABELS[line.role]} could not fill five unique numbers from this pool.`;
       return emptyLine(line.role, index + 1, reason);
     }

@@ -200,3 +200,58 @@ test('full-number expansion stays on the 0-9 pool and legal 1-42 values', () => 
   assert.deepEqual(expanded.find(item => item.digit === 2).numbers, [2, 12, 22, 32, 42]);
   assert.ok(expanded.every(item => item.numbers.every(number => number % 10 === item.digit)));
 });
+
+test('historical baseline averages the same varying pools as observed hits', () => {
+  const draws = [
+    { date: '2026-08-28', numbers: SCREENSHOT_ROW },
+    { date: '2026-08-29', numbers: NEXT_ROW },
+    { date: '2026-08-30', numbers: THIRD_ROW }
+  ];
+  const recipe = { methodVersion: 2, chooser: PIVOT_CHOOSERS.HIGH };
+  const results = draws.slice(1).map((target, index) => {
+    const source = draws[index];
+    const pivots = choosePivots(source.numbers, recipe.chooser, recipe);
+    const digits = buildDigitPool(source.numbers, pivots, recipe).digits;
+    return scorePoolAgainstDigits(digits, target.numbers.map(number => number % 10));
+  });
+  const summary = evaluateWorkbenchHistory(draws, recipe);
+  assert.equal(summary.meanExpected, results.reduce((sum, result) => sum + result.expected, 0) / results.length);
+  assert.equal(summary.meanHits, results.reduce((sum, result) => sum + result.hits, 0) / results.length);
+  assert.equal(summary.meanLift, summary.meanHits - summary.meanExpected);
+  assert.equal(summary.excludesManualPivots, false);
+  assert.equal(summary.excludesEquationEdits, false);
+});
+
+test('manual choices and equation edits explicitly identify the different historical recipe', () => {
+  const draws = [
+    { date: '2026-08-28', numbers: SCREENSHOT_ROW },
+    { date: '2026-08-29', numbers: NEXT_ROW }
+  ];
+  const manual = evaluateWorkbenchHistory(draws, {
+    ...borrowedIncludeSkip, chooser: PIVOT_CHOOSERS.MANUAL, selectedPivots: [8], disabledEquations: ['some-equation']
+  });
+  const automatic = evaluateWorkbenchHistory(draws, { ...borrowedIncludeSkip, chooser: PIVOT_CHOOSERS.TIGHTEST });
+  assert.equal(manual.evaluatedChooser, PIVOT_CHOOSERS.TIGHTEST);
+  assert.equal(manual.excludesManualPivots, true);
+  assert.equal(manual.excludesEquationEdits, true);
+  assert.equal(manual.meanExpected, automatic.meanExpected);
+  assert.equal(manual.meanHits, automatic.meanHits);
+});
+
+test('full-number pool removes invalid and duplicate endings before expansion', () => {
+  const result = fullNumbersForPool([8, '2', 8, 0, '0', 2, -1, 10, 2.5, NaN, Infinity, null, undefined, true, '', 'bad']);
+  assert.deepEqual(result.map(item => item.digit), [0, 2, 8]);
+  const numbers = result.flatMap(item => item.numbers);
+  assert.equal(new Set(numbers).size, numbers.length);
+  assert.ok(numbers.every(number => Number.isInteger(number) && number >= 1 && number <= 42));
+  assert.deepEqual(fullNumbersForPool(null), []);
+});
+
+test('pivot 8 in the screenshot produces exactly 21 sorted full numbers', () => {
+  const board = buildPivotWorkbench([{ date: '2026-09-04', numbers: [5, 8, 12, 28, 36] }], {
+    methodVersion: 2, chooser: PIVOT_CHOOSERS.MANUAL, selectedPivots: [8]
+  });
+  assert.deepEqual(board.combined.digits, [0, 2, 3, 4, 6]);
+  assert.deepEqual(board.eligibleNumbers, [2, 3, 4, 6, 10, 12, 13, 14, 16, 20, 22, 23, 24, 26, 30, 32, 33, 34, 36, 40, 42]);
+  assert.deepEqual(buildPivotWorkbench([]).eligibleNumbers, []);
+});

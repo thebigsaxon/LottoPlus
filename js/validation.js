@@ -1,3 +1,6 @@
+import { sanitizeAutomaticSelection } from './automaticPivot.js?v=1';
+import { normalizeWorkbenchSettings } from './pivotWorkbench.js?v=4';
+import { sanitizePoolDraft, sanitizePoolSelections, scorePoolSelections } from './poolSelections.js?v=2';
 /** Cash 5 Studio data validation and HTML sanitization. */
 
 /**
@@ -561,6 +564,9 @@ function sanitizeSessions(sessions) {
       finalizedAt: String(session.finalizedAt || new Date(0).toISOString()),
       baselineDrawId: String(session.baselineDrawId || ''),
       baselineDate: String(session.baselineDate),
+      poolSelections: sanitizePoolSelections(session.poolSelections),
+      workbenchSettings: session.workbenchSettings ? normalizeWorkbenchSettings(session.workbenchSettings) : undefined,
+      automaticSelection: sanitizeAutomaticSelection(session.automaticSelection),
       historyStartDate: String(session.historyStartDate || ''),
       historyDrawCount: Math.max(0, Math.min(50, Number(session.historyDrawCount) || 0)),
       motifSelections: Array.isArray(session.motifSelections) ? session.motifSelections : [],
@@ -597,7 +603,7 @@ function sanitizeSessions(sessions) {
         forecast: Number(item?.forecast) || 0,
         unusedCount: Math.max(0, Number(item?.unusedCount) || 0)
       })) : [],
-      result
+      result: result ? { ...result, poolScores: scorePoolSelections(session.poolSelections, result.numbers) } : null
     };
   }).filter(Boolean);
 }
@@ -681,6 +687,7 @@ function sanitizeWorkspace(workspace) {
     slipNumbers: looksLikeLegacyDigitLeak ? [null, null, null, null, null] : sanitizeSlipNumbers(workspace.slipNumbers, rowBuilder),
     slipTensFilters: sanitizeSlipTensFilters(workspace.slipTensFilters),
     slipTensSources: sanitizeSlipTensSources(workspace.slipTensSources),
+    poolPickDraft: sanitizePoolDraft(workspace.poolPickDraft),
     draftRows: sanitizeRows(workspace.draftRows),
     sessions: sanitizeSessions(workspace.sessions),
     predictionTracker: workspace.predictionTracker && typeof workspace.predictionTracker === 'object' ? {

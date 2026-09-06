@@ -1,17 +1,19 @@
+import { sanitizeAutomaticSelection } from './automaticPivot.js?v=1';
+import { currentPoolDraft, poolSelectionKey, sanitizePoolSelections, scorePoolSelections } from './poolSelections.js?v=2';
 import { onesDigit } from './onesAnalysis.js';
 import {
   analyzeNextDrawBoard,
   NEXT_DRAW_ANALYZER_VERSION,
   snapshotNextPatternSignals
-} from './patternRecommendations.js?v=10';
+} from './patternRecommendations.js?v=13';
 import {
   hasAvailableOrderedSlip,
   recommendTensBands,
   tensDigitForNumber
 } from './fuzzyTens.js?v=3';
 import { STUDY_SOURCE_KEYS, STUDY_SOURCE_LABELS } from './nextDrawPolicy.js?v=2';
-import { buildPivotWorkbench, DEFAULT_WORKBENCH_SETTINGS } from './pivotWorkbench.js?v=1';
-import { composePoolLines, systemLineLabel } from './poolComposer.js?v=1';
+import { buildPivotWorkbench, DEFAULT_WORKBENCH_SETTINGS } from './pivotWorkbench.js?v=4';
+import { composePoolLines, systemLineLabel } from './poolComposer.js?v=4';
 
 export const PREDICTION_TRACKER_VERSION = 8;
 export const PREDICTION_BACKFILL_COUNT = 10;
@@ -210,7 +212,7 @@ export function createPredictionSession(history, options = {}) {
   const latestDraw = window.at(-1);
   if (!latestDraw) return null;
   const analysis = analyzeNextDrawBoard(window, { limit: 3, includeWalkForward: false });
-  const workbench = buildPivotWorkbench(window, options.workbenchSettings || DEFAULT_WORKBENCH_SETTINGS);
+  const workbench = buildPivotWorkbench(chronological, options.workbenchSettings || DEFAULT_WORKBENCH_SETTINGS);
   const composed = composePoolLines(workbench);
   const rawSignals = snapshotNextPatternSignals(window);
   const patternSignals = rawSignals.map((signal, index) => ({
@@ -239,6 +241,7 @@ export function createPredictionSession(history, options = {}) {
     fullCandidates: [],
     endingPool: [...composed.pool],
     workbenchSettings: { ...workbench.settings },
+    automaticSelection: sanitizeAutomaticSelection(workbench.automaticSelection),
     rows: composed.lines.map(line => buildSystemRowFromComposer(line, window.length)),
     streamSnapshot: analysis.columns.map(result => ({
       column: result.column,
@@ -279,10 +282,50 @@ export function rebuildPendingSystemRows(workspace, draws, workbenchSettings) {
       analyzerPolicy: rebuilt.analyzerPolicy,
       endingPool: rebuilt.endingPool,
       workbenchSettings: rebuilt.workbenchSettings,
+      automaticSelection: rebuilt.automaticSelection,
       rows: [...rebuilt.rows, ...(session.rows || []).filter(row => row.source !== 'system')]
     };
   });
   return { ...workspace, sessions };
+}
+
+/** Save the whole pool and the user's subset for the next official result. */
+export function savePoolSelection(workspace, draws, workbenchSettings, now = new Date()) {
+  const history = chronologicalDraws(draws);
+  const board = buildPivotWorkbench(history, workbenchSettings);
+  if (!board.source || !board.eligibleNumbers.length) throw new Error('Choose a nonempty pool before saving.');
+  const draft = currentPoolDraft(workspace.poolPickDraft, board);
+  const sessions = [...(workspace.sessions || [])];
+  let index = sessions.findIndex(session => session.kind === 'prediction' && session.baselineDate === board.source.date);
+  if (index >= 0 && sessions[index].result) throw new Error('This drawing is already scored. Update Draws before saving new picks.');
+  if (index < 0) {
+    sessions.unshift(createPredictionSession(history, { workbenchSettings, createdAt: now.toISOString() }));
+    index = 0;
+  }
+  const session = sessions[index];
+  const selections = sanitizePoolSelections(session.poolSelections);
+  const selection = {
+    id: `pool-${board.source.date}-${now.getTime()}-${selections.length + 1}`,
+    savedAt: now.toISOString(),
+    poolNumbers: [...board.eligibleNumbers],
+    selectedNumbers: [...draft.selectedNumbers],
+    pivots: [...board.activePivots],
+    workbenchSettings: structuredCloneSafe(board.settings),
+    automaticSelection: sanitizeAutomaticSelection(board.automaticSelection)
+  };
+  const existing = selections.find(item => poolSelectionKey(item) === poolSelectionKey(selection));
+  const updated = { ...session, poolSelections: existing ? selections : [...selections, selection] };
+  sessions[index] = updated;
+  return {
+    workspace: {
+      ...workspace,
+      sessions,
+      poolPickDraft: { baselineDate: board.source.date, selectedNumbers: [] }
+    },
+    session: updated,
+    selection: existing || selection,
+    added: !existing
+  };
 }
 
 export function appendDraftRowsToPendingSession(workspace, latestDraw, history, now = new Date(), workbenchSettings) {
@@ -330,7 +373,15 @@ export function appendDraftRowsToPendingSession(workspace, latestDraw, history, 
 
 export function formatSessionForMessage(session) {
   const rows = (session?.rows || []).filter(row => row.available !== false && row.numbers?.length === 5);
-  if (!rows.length) return '';
+  const poolLines = (session?.poolSelections || []).flatMap((selection, index) => {
+    const numbers = [...new Set((selection?.selectedNumbers || []).map(Number)
+      .filter(number => Number.isInteger(number) && number >= 1 && number <= 42))]
+      .sort((a, b) => a - b);
+    return numbers.length
+      ? [`Pool selection ${index + 1} — your picks: ${numbers.map(number => String(number).padStart(2, '0')).join(' - ')}`]
+      : [];
+  });
+  if (!rows.length && !poolLines.length) return '';
   const heading = `Cash 5 slips — next draw after ${session.baselineDate}`;
   let userIndex = 0;
   const lines = rows.map((row, index) => {
@@ -342,7 +393,7 @@ export function formatSessionForMessage(session) {
         : `User Row ${userIndex}`;
     return `${label}: ${row.numbers.map(number => String(number).padStart(2, '0')).join(' - ')}`;
   });
-  return [heading, ...lines].join('\n');
+  return [heading, ...lines, ...poolLines].join('\n');
 }
 
 export function editSessionInBuilder(workspace, sessionId, now = Date.now()) {
@@ -516,6 +567,7 @@ export function scorePredictionSession(session, actualDraw) {
       systemPrizeLines: systemRows.filter(score => score.hits >= 2).length,
       systemBestLineHits: systemRows.length ? Math.max(...systemRows.map(score => score.hits)) : 0,
       rowScores,
+      poolScores: scorePoolSelections(session.poolSelections, numbers),
       patternSignalScores,
       patternSummary: aggregatePatternScores(patternSignalScores),
       sourceScores: scoreSourceForecasts(session.sourceForecasts, numbers)
@@ -578,6 +630,7 @@ function migratePendingPredictionSessions(workspace, chronological, now) {
     }
     const history = chronological.filter(draw => draw.date <= session.baselineDate);
     const rebuilt = createPredictionSession(history, {
+      workbenchSettings: session.workbenchSettings,
       creationSource: `model-v${NEXT_DRAW_ANALYZER_VERSION}-migration`,
       createdAt: session.finalizedAt || now.toISOString()
     });
@@ -588,6 +641,7 @@ function migratePendingPredictionSessions(workspace, chronological, now) {
       id: session.id,
       finalizedAt: session.finalizedAt || rebuilt.finalizedAt,
       rows: [...rebuilt.rows, ...structuredCloneSafe(userRows)],
+      poolSelections: sanitizePoolSelections(session.poolSelections),
       migratedFromAnalyzerVersion: Number(session.analyzerVersion || session.trackingVersion || 1)
     };
   });

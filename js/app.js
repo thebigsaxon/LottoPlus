@@ -1,4 +1,7 @@
+import { scoreAutomaticPivot } from './automaticPivot.js?v=1';
+import { currentPoolDraft, togglePoolNumber, poolSelectionKey, scorePoolSelections } from './poolSelections.js?v=2';
 /** Main Cash 5 Studio application orchestrator. */
+import { WorkspaceLayout } from './workspaceLayout.js';
 
 import { SAMPLE_CASH_5 } from './sampleData.js?v=3';
 import { parseCSV, autoMapColumns, convertRowsToDraws } from './csvParser.js';
@@ -6,13 +9,14 @@ import { generateAutomatedPatterns } from './patternEngine.js?v=11';
 import { ConnectionEngine, normalizeManualConnectionChains } from './connectionEngine.js?v=11';
 import { createNextDrawingPreview, GridMatrix, NEXT_DRAWING_PREVIEW_ID } from './gridMatrix.js?v=19';
 import { fetchLiveCash5Update } from './liveFetcher.js?v=4';
-import { validateProject, validateDraw, escapeHTML } from './validation.js?v=11';
+import { validateProject, validateDraw, escapeHTML } from './validation.js?v=13';
 import { cash5AnalysisWindow, cash5ResearchWindow } from './drawFilters.js?v=2';
 import { findBoardSimilarSequences } from './motifEngine.js?v=4';
 import { buildNumberEvidence } from './evidenceEngine.js';
 import { classifyOnesHeat } from './onesAnalysis.js';
 import {
   appendDraftRowsToPendingSession,
+  savePoolSelection,
   autoSelectTensFilters,
   createDraftRow,
   editSessionInBuilder,
@@ -22,10 +26,10 @@ import {
   reconcileOfficialDraws,
   refreshPredictionSessionScores,
   summarizePredictionHistory
-} from './sessionStore.js?v=15';
+} from './sessionStore.js?v=19';
 import { applySystemDrawingPick, applyUserDigitPick, futureCellEvidence, nextDrawingPreviewNumbers, rankHistoricalSuccessors, selectFutureDigit } from './futureWorkspace.js?v=11';
 import { buildDigitRepeatSummary } from './repeatSummary.js?v=6';
-import { analyzeNextDrawBoard } from './patternRecommendations.js?v=11';
+import { analyzeNextDrawBoard } from './patternRecommendations.js?v=13';
 import { hasAvailableOrderedSlip, recommendTensBands, TENS_BANDS, tensDigitForNumber } from './fuzzyTens.js?v=3';
 import {
   buildPivotPool,
@@ -39,10 +43,11 @@ import {
   DEFAULT_WORKBENCH_SETTINGS,
   equationKey,
   normalizeWorkbenchSettings,
+  migrateLiveWorkbenchSettings,
   PIVOT_CHOOSERS,
   toggleManualPivot
-} from './pivotWorkbench.js?v=1';
-import { composePoolLines, systemLineLabel } from './poolComposer.js?v=1';
+} from './pivotWorkbench.js?v=4';
+import { composePoolLines, LINE_DESCRIPTIONS, systemLineLabel } from './poolComposer.js?v=4';
 import { detectNumberTheme } from './numberTheme.js?v=1';
 import { sessionTargetDrawingDate } from './dateUtils.js?v=1';
 
@@ -77,6 +82,7 @@ function createWorkspaceState() {
     slipNumbers: [null, null, null, null, null],
     slipTensFilters: [null, null, null, null, null],
     slipTensSources: ['empty', 'empty', 'empty', 'empty', 'empty'],
+    poolPickDraft: null,
     draftRows: [],
     sessions: [],
     predictionTracker: null
@@ -98,6 +104,7 @@ export class Cash5StudioApp {
     this.activePivotReference = null;
     this.activeWinningPivotDrawId = null;
     this.nextDrawAnalysisCache = null;
+    this.nextDrawTab = 'pivot';
     this.numberTheme = null;
     this.lastThemeAlertDate = null;
     this.pivotWorkbenchSettings = { ...DEFAULT_WORKBENCH_SETTINGS, operators: { ...DEFAULT_WORKBENCH_SETTINGS.operators }, selectedPivots: [], disabledEquations: [] };
@@ -140,6 +147,7 @@ export class Cash5StudioApp {
       this.loadFromLocalStorage();
       this.loadPivotWorkbenchSettings();
       this.applyFilters({ initializeLedger: true });
+      this.panelLayout = new WorkspaceLayout(document.getElementById('cash5Workspace'), () => this.connectionEngine?.render());
     });
   }
 
@@ -189,7 +197,6 @@ export class Cash5StudioApp {
     this.cash5Workspace = document.getElementById("cash5Workspace");
     this.motifSelectionSummary = document.getElementById("motifSelectionSummary");
     this.futureMapCard = document.getElementById("futureMapCard");
-    this.nextDrawIntro = document.getElementById("nextDrawIntro");
     this.pivotWorkbench = document.getElementById("pivotWorkbench");
     this.nextDrawTracks = document.getElementById("nextDrawTracks");
     this.futureDigitGrid = document.getElementById("futureDigitGrid");
@@ -307,6 +314,7 @@ export class Cash5StudioApp {
     });
     document.body.classList.toggle('zoom-enlarged', closest >= 1.2);
     document.body.classList.toggle('zoom-extra', closest >= 1.4);
+    this.panelLayout?.schedule();
     if (this.zoomLevel) this.zoomLevel.textContent = `${Math.round(closest * 100)}%`;
     if (this.btnZoomOut) this.btnZoomOut.disabled = closest === INTERFACE_ZOOM_STEPS[0];
     if (this.btnZoomIn) this.btnZoomIn.disabled = closest === INTERFACE_ZOOM_STEPS[INTERFACE_ZOOM_STEPS.length - 1];
@@ -517,7 +525,47 @@ export class Cash5StudioApp {
     }
 
     if (this.pivotWorkbench) {
+      this.pivotWorkbench.querySelectorAll('[data-next-draw-tab]').forEach(button => {
+        button.addEventListener('click', () => {
+          this.nextDrawTab = button.dataset.nextDrawTab === 'manual' ? 'manual' : 'pivot';
+          this.updateNextDrawTab();
+        });
+      });
       this.pivotWorkbench.addEventListener('click', (event) => {
+        const poolNumber = event.target.closest('[data-pool-number]');
+        if (poolNumber) {
+          const board = buildPivotWorkbench(this.draws, this.pivotWorkbenchSettings);
+          const number = Number(poolNumber.dataset.poolNumber);
+          this.workspace.poolPickDraft = togglePoolNumber(this.workspace.poolPickDraft, board, number);
+          this.workspace.nextDrawingPreviewHidden = false;
+          if (this.chkCompleteNumbers) {
+            this.patternSettings.showCompleteNumbers = true;
+            this.chkCompleteNumbers.checked = true;
+          }
+          this.renderCash5Workspace();
+          this.pivotWorkbench.querySelector(`[data-pool-number="${number}"]`)?.focus({ preventScroll: true });
+          this.saveToLocalStorage();
+          return;
+        }
+        if (event.target.closest('[data-save-pool]')) {
+          try {
+            const saved = savePoolSelection(this.workspace, this.draws, this.pivotWorkbenchSettings);
+            this.workspace = saved.workspace;
+            this.saveToLocalStorage();
+            this.renderCash5Workspace();
+            this.showToast(`${saved.added ? 'Pool and selections saved' : 'Already saved'} for ${sessionTargetDrawingDate(saved.session)}.`);
+          } catch (error) { this.showToast(error.message); }
+          return;
+        }
+        if (event.target.closest('[data-clear-pool]')) {
+          const board = buildPivotWorkbench(this.draws, this.pivotWorkbenchSettings);
+          const draft = currentPoolDraft(this.workspace.poolPickDraft, board);
+          this.workspace.poolPickDraft = { ...draft, selectedNumbers: [] };
+          this.workspace.nextDrawingPreviewHidden = false;
+          this.renderCash5Workspace();
+          this.saveToLocalStorage();
+          return;
+        }
         const chooser = event.target.closest('[data-workbench-chooser]');
         if (chooser) {
           this.applyPivotWorkbenchChange({ chooser: chooser.dataset.workbenchChooser, disabledEquations: [] });
@@ -606,18 +654,8 @@ export class Cash5StudioApp {
     this.btnTheme?.addEventListener("click", () => this.toggleTheme());
 
     this.btnClearSlip?.addEventListener("click", () => {
-      this.workspace.slipNumbers = [null, null, null, null, null];
-      this.workspace.slipTensFilters = [null, null, null, null, null];
-      this.workspace.slipTensSources = ['empty', 'empty', 'empty', 'empty', 'empty'];
-      this.workspace.rowBuilder = [];
-      this.refreshAutomaticTens();
-      this.renderCash5Workspace();
-      this.saveToLocalStorage();
+      this.clearNextDrawSelections();
     });
-    this.btnJumpToSlip?.addEventListener("click", () => {
-      this.composerCard?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-
     this.btnPatterns?.addEventListener("click", () => {
       const shouldOpen = this.patternsPopover.hidden;
       this.patternsPopover.hidden = !shouldOpen;
@@ -970,11 +1008,12 @@ export class Cash5StudioApp {
     try {
       const stored = JSON.parse(localStorage.getItem(WORKBENCH_KEY) || 'null');
       if (stored && typeof stored === 'object') {
-        this.pivotWorkbenchSettings = normalizeWorkbenchSettings(stored);
+        this.pivotWorkbenchSettings = migrateLiveWorkbenchSettings(stored);
       }
     } catch (_) {
-      this.pivotWorkbenchSettings = normalizeWorkbenchSettings(DEFAULT_WORKBENCH_SETTINGS);
+      this.pivotWorkbenchSettings = migrateLiveWorkbenchSettings(DEFAULT_WORKBENCH_SETTINGS);
     }
+    this.persistPivotWorkbenchSettings();
   }
 
   persistPivotWorkbenchSettings() {
@@ -984,9 +1023,13 @@ export class Cash5StudioApp {
   }
 
   applyPivotWorkbenchChange(patch = {}) {
+    const chooserPatch = patch.chooser === PIVOT_CHOOSERS.MANUAL && !Object.prototype.hasOwnProperty.call(patch, 'selectedPivots')
+      ? { selectedPivots: [] }
+      : {};
     this.pivotWorkbenchSettings = normalizeWorkbenchSettings({
       ...this.pivotWorkbenchSettings,
       ...patch,
+      ...chooserPatch,
       operators: patch.operators
         ? { ...this.pivotWorkbenchSettings.operators, ...patch.operators }
         : this.pivotWorkbenchSettings.operators
@@ -997,84 +1040,118 @@ export class Cash5StudioApp {
     this.renderCash5Workspace();
   }
 
+  updateNextDrawTab() {
+    const manual = this.nextDrawTab === 'manual';
+    this.pivotWorkbench?.querySelectorAll('[data-next-draw-tab]').forEach(button => {
+      const active = (button.dataset.nextDrawTab === 'manual') === manual;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+      button.tabIndex = active ? 0 : -1;
+    });
+    const pivotPanel = document.getElementById('pivotTabPanel');
+    const manualPanel = document.getElementById('manualTabPanel');
+    if (pivotPanel) pivotPanel.hidden = manual;
+    if (manualPanel) manualPanel.hidden = !manual;
+  }
+
   renderPivotWorkbench(board = null) {
     if (!this.pivotWorkbench) return;
     board = board || buildPivotWorkbench(this.draws, this.pivotWorkbenchSettings);
     const settings = board.settings;
+    const automatic = board.automaticSelection;
+    const referenceOpen = this.pivotWorkbench.querySelector('.pivot-workbench-reference')?.open;
+    const chooserHelp = {
+      [PIVOT_CHOOSERS.AUTO]: 'Reviews previous winning pivots, transitions, loops, recurrence, and pool size. Chooses automatically using evidence available before the next draw.',
+      [PIVOT_CHOOSERS.HIGH]: 'High uses the largest source ending.',
+      [PIVOT_CHOOSERS.LOW]: 'Low uses the smallest source ending.',
+      [PIVOT_CHOOSERS.TIGHTEST]: 'Tightest picks the smallest pool before equation edits; smaller does not mean more likely.',
+      [PIVOT_CHOOSERS.ZERO_ALTERNATE]: '0 + alternate pairs zero with another source ending, using the previous draw when available. Without zero, it uses High.',
+      [PIVOT_CHOOSERS.MANUAL]: 'Choose up to two source cards to combine their endings.'
+    };
     const chip = (label, active, attrs) => (
       `<button type="button" class="pivot-workbench-chip${active ? ' active' : ''}" ${attrs} aria-pressed="${active}">${label}</button>`
     );
     const chooserChip = (key, label) => chip(label, settings.chooser === key, `data-workbench-chooser="${key}"`);
-    const formatHits = value => Number(value || 0).toFixed(2);
-    const formatRate = value => `${Math.round((Number(value) || 0) * 100)}%`;
     const sourceDigits = board.source?.digits?.join('  ') || '—';
     const candidateMarkup = board.candidates.map(item => {
       const active = board.activePivots.includes(item.digit);
-      const roles = [item.isHigh ? 'high' : '', item.isLow ? 'low' : '', item.isTwin ? 'twin' : '']
-        .filter(Boolean).join(' · ') || 'unique';
-      return `<button type="button" class="pivot-workbench-candidate${active ? ' active' : ''}" data-workbench-pivot="${item.digit}" aria-pressed="${active}">
-        <b>${item.digit}</b>
-        <small>${item.count}× · ${escapeHTML(roles)}</small>
-        <small>pool ${item.poolWidth}</small>
-      </button>`;
+      return `<button type="button" class="pivot-workbench-candidate${active ? ' active' : ''}" data-workbench-pivot="${item.digit}" aria-pressed="${active}" aria-label="Pivot ${item.digit}">${item.digit}</button>`;
     }).join('');
     const equations = (board.pool.equations || []).map(item => {
       const key = equationKey(item);
       const disabled = settings.disabledEquations.includes(key);
+      if (automatic) return `<span class="pivot-workbench-chip">${escapeHTML(item.explanation)}</span>`;
       return `<button type="button" class="pivot-workbench-chip${disabled ? ' muted' : ''}" data-workbench-equation="${escapeHTML(key)}" aria-pressed="${!disabled}">${escapeHTML(item.explanation)}</button>`;
     }).join('');
-    const sourceDigitSet = new Set(board.source?.digits || []);
-    const poolDigits = board.combined.digits.map(digit => (
-      `<span class="pivot-workbench-digit${sourceDigitSet.has(digit) ? ' prior' : ''}" title="${sourceDigitSet.has(digit) ? `Ending ${digit} was also on the source row, so it can repeat.` : `Ending ${digit} from the pivot.`}">${digit}</span>`
-    )).join('');
-    const numbers = board.fullNumbers.map(item => (
-      `<p><b>${item.digit}</b>${item.numbers.map(number => String(number).padStart(2, '0')).join(' · ')}</p>`
-    )).join('');
-    const historyNote = settings.chooser === PIVOT_CHOOSERS.MANUAL
-      ? 'History uses Tightest with these operators; a hand-picked digit is not a single rule.'
-      : 'History is the same chooser and operators on completed pairs. It never reads the next row.';
-    const empty = !board.source
-      ? '<p class="pivot-workbench-empty">Load official drawings to build an ending pool from the latest row.</p>'
-      : '';
-
-    this.pivotWorkbench.innerHTML = `
-      <div class="pivot-workbench-header">
-        <strong>Ending pool from ${escapeHTML(board.source?.date || 'the latest row')}</strong>
-        <small>Latest draw only · feeds Core, Spread, and Guard</small>
-      </div>
-      ${empty || `
-      <div class="pivot-workbench-row"><em>Source</em><span class="pivot-workbench-source">${escapeHTML(sourceDigits)}</span></div>
+    const poolContainer = this.pivotWorkbench.querySelector('#pivotNumberPool');
+    const controlsContainer = this.pivotWorkbench.querySelector('#pivotControls');
+    if (!poolContainer || !controlsContainer) return;
+    const numbers = board.eligibleNumbers;
+    const draft = currentPoolDraft(this.workspace.poolPickDraft, board);
+    this.workspace.poolPickDraft = draft;
+    const selected = new Set(draft.selectedNumbers);
+    const pending = this.workspace.sessions.find(session => session.kind === 'prediction' && !session.result && session.baselineDate === board.source?.date);
+    const currentKey = poolSelectionKey({ poolNumbers: numbers, selectedNumbers: draft.selectedNumbers, pivots: board.activePivots });
+    const alreadySaved = (pending?.poolSelections || []).some(item => poolSelectionKey(item) === currentKey);
+    const targetDate = sessionTargetDrawingDate({ baselineDate: board.source?.date });
+    poolContainer.innerHTML = `
+      <div class="number-pool-header"><h2>Number pool</h2><span>${numbers.length} numbers${board.activePivots.length ? ` · ${automatic ? 'Auto pivot' : 'Pivot'} ${board.activePivots.join(' + ')}` : ''}</span></div>
+      ${numbers.length
+        ? `<ul class="number-pool-grid" aria-label="Eligible numbers">${numbers.map(number => `<li><button type="button" data-pool-number="${number}" aria-label="Pick ${number}" aria-pressed="${selected.has(number)}">${number}</button></li>`).join('')}</ul>`
+        : `<p class="board-help">${board.source ? 'No numbers in this pool. Open Options to choose a pivot or enable an equation.' : 'Load official drawings to build a number pool.'}</p>`}
+      ${numbers.length ? `<div class="pool-save-bar"><span role="status">${selected.size ? `${selected.size} selected` : 'Tap numbers to pick'} · ${targetDate}</span><div class="pool-save-actions"><button type="button" class="btn btn-primary" data-save-pool ${alreadySaved ? 'disabled' : ''} title="Save the full pool and your selected numbers for this drawing">${alreadySaved ? 'Saved ✓' : selected.size ? 'Save selections' : 'Save pool'}</button><button type="button" class="text-btn" data-clear-pool ${selected.size ? '' : 'disabled'}>Clear selection</button></div></div>` : ''}
+    `;
+    controlsContainer.innerHTML = `
+      <p class="board-help">Source ${escapeHTML(board.source?.date || 'unavailable')}${board.source ? ` · Endings ${escapeHTML(sourceDigits)}` : ''}</p>
       <div class="pivot-workbench-row"><em>Pivot</em>
+        ${chooserChip(PIVOT_CHOOSERS.AUTO, 'Automatic')}
         ${chooserChip(PIVOT_CHOOSERS.HIGH, 'High')}
         ${chooserChip(PIVOT_CHOOSERS.LOW, 'Low')}
         ${chooserChip(PIVOT_CHOOSERS.TIGHTEST, 'Tightest')}
         ${chooserChip(PIVOT_CHOOSERS.ZERO_ALTERNATE, '0 + alternate')}
         ${chooserChip(PIVOT_CHOOSERS.MANUAL, 'Manual')}
       </div>
-      <div class="pivot-workbench-candidates">${candidateMarkup}</div>
-      <div class="pivot-workbench-row"><em>Pool ${board.combined.width}</em><span class="pivot-workbench-pool">${poolDigits || '<span class="pivot-workbench-empty">Pick a pivot.</span>'}</span></div>
-      ${board.combined.tooNarrow ? '<p class="pivot-workbench-warning">Pool is under 3 digits — likely to miss the next row.</p>' : ''}
-      ${numbers ? `<div class="pivot-workbench-numbers">${numbers}</div>` : ''}
-      <details class="pivot-workbench-reference">
+      <p class="board-help" id="pivotChooserHelp">${escapeHTML(chooserHelp[settings.chooser])}</p>
+      ${automatic ? `<div class="automatic-pivot-review">
+        <p class="board-help">${automatic.historyDraws} drawings reviewed through ${escapeHTML(automatic.sourceDate)} · ${automatic.completedPairs} completed pairs. ${escapeHTML(automatic.reason)}</p>
+        <table><caption>Estimated chance of being a best-covering pivot, including ties</caption><thead><tr><th>Pivot</th><th>Estimate</th><th>Pool size</th></tr></thead><tbody>${automatic.candidates.map(candidate => `<tr><th>${candidate.digit}${automatic.pivots.includes(candidate.digit) ? ' · chosen' : ''}</th><td>${Math.round(candidate.probability * 100)}%</td><td>${candidate.poolSize} numbers</td></tr>`).join('')}</tbody></table>
+        <p class="board-help">These are historical model estimates, not ticket-winning odds. Ties mean percentages can total more than 100%. Two pivots are used only when prior testing supports the added coverage.</p>
+      </div>` : `<div class="pivot-workbench-candidates" aria-describedby="pivotChooserHelp">${candidateMarkup}</div>`}
+      <details class="pivot-workbench-reference" ${referenceOpen ? 'open' : ''}>
         <summary>Reference</summary>
-        <div class="pivot-workbench-row"><em>Operators</em>
+        <p class="board-help">Pool endings: ${board.combined.digits.join(', ') || 'none'}. Full numbers are limited to 1–42.</p>
+        ${automatic ? '<p class="board-help">Uses the Winning Pivot rules: addition modulo 10 and borrowed subtraction against the other source balls, including repeated endings. The same rules are used for training, pool construction, and result checking.</p>' : `<div class="pivot-workbench-row"><em>Operators</em>
           ${chip('Add', settings.operators.add, 'data-workbench-operator="add"')}
           ${chip('Direct −', settings.operators.direct, 'data-workbench-operator="direct"')}
           ${chip('Borrowed −', settings.operators.borrowed, 'data-workbench-operator="borrowed"')}
           ${chip('Include pivot', settings.includePivotDigit, 'data-workbench-flag="includePivotDigit"')}
           ${chip('Skip other copy', settings.skipSharedPivotDigit, 'data-workbench-flag="skipSharedPivotDigit"')}
-        </div>
+        </div>`}
         ${equations ? `<div class="pivot-workbench-row"><em>Equations</em></div><div class="pivot-workbench-equations">${equations}</div>` : ''}
-        <div class="pivot-workbench-stats">
-          <span><small>Width</small><b>${board.combined.width}</b></span>
-          <span><small>Chance hits</small><b>${formatHits(board.combined.expected)}</b></span>
-          <span><small>History hits</small><b>${formatHits(board.history.meanHits)}</b></span>
-          <span><small>History lift</small><b>${board.history.meanLift >= 0 ? '+' : ''}${formatHits(board.history.meanLift)}</b></span>
-        </div>
-        <div class="pivot-workbench-row"><small>${board.history.draws} pairs · 4+ ${formatRate(board.history.fourPlusRate)} · ${escapeHTML(historyNote)}</small></div>
       </details>
-      `}
     `;
+    controlsContainer.querySelectorAll('[data-workbench-chooser]').forEach(button => {
+      button.addEventListener('click', event => {
+        event.stopPropagation();
+        const chooser = button.dataset.workbenchChooser;
+        this.applyPivotWorkbenchChange({
+          chooser,
+          selectedPivots: chooser === PIVOT_CHOOSERS.MANUAL ? [] : this.pivotWorkbenchSettings.selectedPivots,
+          disabledEquations: []
+        });
+      });
+    });
+    controlsContainer.querySelectorAll('[data-workbench-pivot]').forEach(button => {
+      button.addEventListener('click', event => {
+        event.stopPropagation();
+        const digit = Number(button.dataset.workbenchPivot);
+        this.applyPivotWorkbenchChange({
+          chooser: PIVOT_CHOOSERS.MANUAL,
+          selectedPivots: toggleManualPivot(this.pivotWorkbenchSettings.selectedPivots, digit),
+          disabledEquations: []
+        });
+      });
+    });
   }
 
   updateLatestDrawStatus() {
@@ -1123,26 +1200,17 @@ export class Cash5StudioApp {
   }
 
   bindWorkspaceEvents() {
-    if (this.btnClearFutureMap) {
-      this.btnClearFutureMap.addEventListener('click', () => {
-        this.workspace.futureDigitMap = [];
-        this.workspace.systemDigitMap = [];
-        this.workspace.systemSlipNumbers = [null, null, null, null, null];
-        this.workspace.nextDrawingPreviewHidden = true;
-        this.workspace.motifMatches = [];
-        this.workspace.activeFutureCell = null;
-        this.workspace.slipNumbers = [null, null, null, null, null];
-        this.workspace.slipTensFilters = [null, null, null, null, null];
-        this.workspace.slipTensSources = ['empty', 'empty', 'empty', 'empty', 'empty'];
-        this.workspace.rowBuilder = [];
-        this.activeDigitHighlight = null;
-        this.gridMatrix?.setHighlightedDigit(null);
-        this.gridMatrix?.setPositionHighlights([]);
-        this.refreshAutomaticTens();
-        this.renderCash5Workspace();
-        this.saveToLocalStorage();
+    const clearFutureMap = () => {
+      this.clearNextDrawSelections();
+    };
+    this.pivotWorkbench?.querySelectorAll('[data-clear-future-map]').forEach(button => {
+      button.addEventListener('click', clearFutureMap);
+    });
+    this.pivotWorkbench?.querySelectorAll('[data-jump-to-slip]').forEach(button => {
+      button.addEventListener('click', () => {
+        this.composerCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
-    }
+    });
     if (this.btnClearMotif) {
       this.btnClearMotif.addEventListener('click', () => {
         this.workspace.motifMatches = [];
@@ -1216,6 +1284,25 @@ export class Cash5StudioApp {
     }
   }
 
+  clearNextDrawSelections() {
+        this.workspace.futureDigitMap = [];
+        this.workspace.systemDigitMap = [];
+        this.workspace.systemSlipNumbers = [null, null, null, null, null];
+        this.workspace.nextDrawingPreviewHidden = true;
+        this.workspace.motifMatches = [];
+        this.workspace.activeFutureCell = null;
+        this.workspace.slipNumbers = [null, null, null, null, null];
+        this.workspace.slipTensFilters = [null, null, null, null, null];
+        this.workspace.slipTensSources = ['empty', 'empty', 'empty', 'empty', 'empty'];
+        this.workspace.rowBuilder = [];
+        this.activeDigitHighlight = null;
+        this.gridMatrix?.setHighlightedDigit(null);
+        this.gridMatrix?.setPositionHighlights([]);
+        this.refreshAutomaticTens();
+        this.renderCash5Workspace();
+        this.saveToLocalStorage();
+  }
+
   setSlipNumberForPosition(number, column) {
     const value = Number(number);
     const position = Number(column);
@@ -1248,11 +1335,9 @@ export class Cash5StudioApp {
     const workbench = buildPivotWorkbench(this.draws, this.pivotWorkbenchSettings);
     const composed = composePoolLines(workbench);
     this.composedLines = composed;
-    if (this.nextDrawIntro) {
-      this.nextDrawIntro.innerHTML = `<strong>Three lines from the ending pool after ${escapeHTML(workbench.source?.date || boardAnalysis.targetAfterDate || 'the latest loaded date')}.</strong> You steer the 0–9 tell. The app plays the whole pool as Core, Spread, and Guard so one favourite digit cannot eat the slip.`;
-    }
 
     this.renderPivotWorkbench(workbench);
+    this.updateNextDrawTab();
 
     if (this.nextDrawTracks) {
       this.nextDrawTracks.hidden = true;
@@ -1265,7 +1350,7 @@ export class Cash5StudioApp {
         <div class="future-grid-corner">Line</div>
         ${Array.from({ length: 5 }, (_, column) => `<div class="future-space-head">Ball ${column + 1}</div>`).join('')}
         ${composed.lines.map(line => `
-          <div class="pattern-rank-label">${escapeHTML(line.label)}</div>
+          <div class="pattern-rank-label" title="${escapeHTML(LINE_DESCRIPTIONS[line.role])}">${escapeHTML(line.label)}</div>
           ${Array.from({ length: 5 }, (_, column) => {
             const position = line.positions?.[column];
             if (!line.available || !position) {
@@ -1283,7 +1368,8 @@ export class Cash5StudioApp {
               <span class="pattern-recommendation-number">${cash5NumberMarkup(position.number)}</span>
               <small>${position.digit}</small>
             </button>`;
-          }).join('')}`).join('')}`;
+          }).join('')}`).join('')}
+        ${composed.lines.some(line => !line.available) ? `<p class="board-help board-availability" role="status">${escapeHTML(composed.unavailableReason || composed.lines.filter(line => !line.available).map(line => line.unavailableReason).join(' '))}</p>` : ''}`;
     }
 
     if (this.futureAllDigitGrid) {
@@ -1597,7 +1683,20 @@ export class Cash5StudioApp {
           || slip.slice(0, index).every(number => !Number.isInteger(number) || number < current)
             && slip.slice(index + 1).every(number => !Number.isInteger(number) || number > current);
         const currentIsValid = currentMatchesMap && currentMatchesTens && currentIsUnique && currentIsOrdered;
-        const options = [...new Set([...(Number.isInteger(current) ? [current] : []), ...available])].sort((a, b) => a - b);
+        const availableNumbers = new Set(available);
+        const numbersByTens = TENS_BANDS.map(band => ({
+          band,
+          numbers: available.filter(number => tensDigitForNumber(number) === band.digit)
+        })).filter(group => group.numbers.length);
+        const preferredTens = [
+          ...(tensFilter === null ? [] : [tensFilter]),
+          ...(recommendationAvailable ? [recommendation.primary.digit] : []),
+          ...(recommendation.alternate ? [recommendation.alternate.digit] : []),
+          ...TENS_BANDS.map(band => band.digit)
+        ];
+        const orderedNumberGroups = [...new Set(preferredTens)]
+          .map(digit => numbersByTens.find(group => group.band.digit === digit))
+          .filter(Boolean);
         const helper = mappedDigits.length
           ? `Showing numbers ending in ${mappedDigits.join(', ')}`
           : `All valid numbers ${minimum}–${maximum}`;
@@ -1608,34 +1707,41 @@ export class Cash5StudioApp {
           <span class="slip-slot-head"><strong>Ball ${index + 1}</strong>${mappedDigits.length ? `<span class="mapped-ending position-${index + 1}"><small>Mapped ending</small><b>${mappedDigits[0]}</b></span>` : '<span class="no-mapped-ending">No digit filter</span>'}</span>
           <div class="fuzzy-recommendation">
             <span><b>${recommendationAvailable ? recommendation.primary.label : 'No available tens range'}</b><small>${recommendationAvailable ? `${recommendation.primary.confidence} · ${recommendation.primary.reason}` : 'Change another Ball filter or mapped ending'}</small></span>
-            <button type="button" data-use-tens="${recommendation.primary.digit}" data-tens-position="${index}" aria-label="Use ${recommendation.primary.label} recommendation for Ball ${index + 1}" aria-pressed="${tensFilter === recommendation.primary.digit}" ${recommendationAvailable ? '' : 'disabled'}>${tensFilter === recommendation.primary.digit ? 'Using' : 'Use'}</button>
+            <strong class="recommendation-state">${tensFilter === recommendation.primary.digit ? 'Selected' : 'Suggested'}</strong>
           </div>
-          <label class="slip-field-label">Tens range <em class="tens-source ${tensSources[index]}">${tensSources[index] === 'automatic' ? 'Auto' : tensSources[index] === 'manual' ? 'Manual' : ''}</em>
-            <select class="tens-filter-select" data-slip-tens="${index}" aria-label="Tens range for Ball ${index + 1}">
-              <option value="">Any tens</option>
-              ${TENS_BANDS.map(band => {
-                const rankedBand = recommendation.ranked.find(item => item.digit === band.digit);
-                const unavailable = !rankedBand?.available;
-                const suffix = unavailable ? ' — Unavailable' : band.digit === recommendation.primary.digit
-                  ? ` — ${recommendation.primary.confidence}` : band.digit === recommendation.alternate?.digit ? ' — Alternate' : '';
-                return `<option value="${band.digit}" ${band.digit === tensFilter ? 'selected' : ''} ${unavailable ? 'disabled' : ''}>${band.label}${suffix}</option>`;
-              }).join('')}
-            </select>
-          </label>
-          <label class="slip-field-label">Full number
-          <select data-slip-position="${index}" aria-label="Full number for Ball ${index + 1}">
-            <option value="">Choose…</option>
-            ${options.map(number => `<option value="${number}" ${number === current ? 'selected' : ''}>${number}</option>`).join('')}
-          </select>
-          </label>
+          <div class="slip-field-label">Tens range <em class="tens-source ${tensSources[index]}">${tensSources[index] === 'automatic' ? 'Auto' : tensSources[index] === 'manual' ? 'Manual' : ''}</em></div>
+          <div class="choice-grid tens-choice-grid" role="group" aria-label="Tens range for Ball ${index + 1}">
+            <button type="button" class="choice-button ${tensFilter === null ? 'selected' : ''}" data-slip-tens="${index}" data-slip-tens-value="" aria-pressed="${tensFilter === null}">Any</button>
+            ${TENS_BANDS.map(band => {
+              const rankedBand = recommendation.ranked.find(item => item.digit === band.digit);
+              const unavailable = !rankedBand?.available;
+              const suffix = unavailable ? 'Unavailable' : band.digit === recommendation.primary.digit
+                ? recommendation.primary.confidence : band.digit === recommendation.alternate?.digit ? 'Alternate' : '';
+              return `<button type="button" class="choice-button ${band.digit === tensFilter ? 'selected' : ''}" data-slip-tens="${index}" data-slip-tens-value="${band.digit}" aria-pressed="${band.digit === tensFilter}" ${unavailable ? 'disabled' : ''} title="${suffix}">${band.shortLabel}</button>`;
+            }).join('')}
+          </div>
+          <div class="slip-field-label number-choice-label">Full number <span>${availableNumbers.size} valid pick${availableNumbers.size === 1 ? '' : 's'}</span></div>
+          <div class="number-choice-list" role="group" aria-label="Valid full numbers for Ball ${index + 1}">
+            ${orderedNumberGroups.map((group, groupIndex) => `
+              <div class="number-choice-row ${groupIndex === 0 ? 'preferred' : ''}">
+                <span class="number-choice-row-label">${groupIndex === 0 ? 'Recommended' : 'Alternate'}<small>${group.band.shortLabel}</small></span>
+                <div class="number-choice-grid">
+                  ${group.numbers.map(number => {
+                    const selected = number === current;
+                    return `<button type="button" class="number-choice ${selected ? 'selected' : ''}" data-slip-position="${index}" data-slip-number="${number}" aria-pressed="${selected}">${String(number).padStart(2, '0')}</button>`;
+                  }).join('')}
+                </div>
+              </div>
+            `).join('') || '<span class="no-number-choices">No valid picks with the current filters.</span>'}
+          </div>
           <small>${currentIsValid ? `${helper}${tensFilter === null ? '' : ` in ${TENS_BANDS.find(band => band.digit === tensFilter)?.label}`}.${recommendation.alternate ? ` Alternate: ${recommendation.alternate.label}.` : ''}` : invalidMessage}</small>
         </div>`;
       }).join('');
 
-      this.rowBuilderContainer.querySelectorAll('[data-slip-tens]').forEach(select => {
-        select.addEventListener('change', () => {
-          const position = Number(select.dataset.slipTens);
-          const tens = select.value === '' ? null : Number(select.value);
+      this.rowBuilderContainer.querySelectorAll('[data-slip-tens]').forEach(button => {
+        button.addEventListener('click', () => {
+          const position = Number(button.dataset.slipTens);
+          const tens = button.dataset.slipTensValue === '' ? null : Number(button.dataset.slipTensValue);
           this.workspace.slipTensFilters[position] = tens;
           this.workspace.slipTensSources[position] = 'manual';
           const current = this.workspace.slipNumbers[position];
@@ -1645,24 +1751,10 @@ export class Cash5StudioApp {
           this.saveToLocalStorage();
         });
       });
-      this.rowBuilderContainer.querySelectorAll('[data-use-tens]').forEach(button => {
+      this.rowBuilderContainer.querySelectorAll('[data-slip-position]').forEach(button => {
         button.addEventListener('click', () => {
-          const position = Number(button.dataset.tensPosition);
-          const tens = Number(button.dataset.useTens);
-          this.workspace.slipTensFilters[position] = tens;
-          this.workspace.slipTensSources[position] = 'manual';
-          const current = this.workspace.slipNumbers[position];
-          if (Number.isInteger(current) && tensDigitForNumber(current) !== tens) this.workspace.slipNumbers[position] = null;
-          this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
-          this.renderCash5Workspace();
-          this.saveToLocalStorage();
-        });
-      });
-
-      this.rowBuilderContainer.querySelectorAll('[data-slip-position]').forEach(select => {
-        select.addEventListener('change', () => {
-          const position = Number(select.dataset.slipPosition);
-          const value = select.value === '' ? null : Number(select.value);
+          const position = Number(button.dataset.slipPosition);
+          const value = Number(button.dataset.slipNumber);
           this.workspace.slipNumbers[position] = value;
           this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
           this.renderCash5Workspace();
@@ -1677,7 +1769,7 @@ export class Cash5StudioApp {
     if (this.slipGuidance) {
       this.slipGuidance.textContent = isComplete
         ? `Slip ready: ${filledNumbers.join(' · ')}`
-        : 'Choose one full number in each position. The menus prevent duplicates and out-of-order rows.';
+        : 'Choose one full number in each position. Unavailable choices are disabled to prevent duplicates and out-of-order rows.';
     }
     if (this.btnAddDraftRow) this.btnAddDraftRow.disabled = !isComplete;
 
@@ -1854,6 +1946,20 @@ export class Cash5StudioApp {
           </div>
         </article>`;
       }).join('');
+      const poolScores = new Map((session.result ? scorePoolSelections(session.poolSelections, session.result.numbers) : []).map(score => [score.selectionId, score]));
+      const poolMarkup = (session.poolSelections || []).map((selection, index) => {
+        const score = poolScores.get(selection.id);
+        const chosenHits = score?.selectedMatchedNumbers || [];
+        const poolHits = score?.poolMatchedNumbers || [];
+        return `<article class="saved-pool-selection">
+          <div class="session-pick-label"><strong>Pool selection ${index + 1}</strong><small>${selection.automaticSelection ? 'Auto pivot' : 'Pivot'} ${selection.pivots.join(' + ') || '—'} · saved ${escapeHTML(selection.savedAt.slice(0, 10))}</small></div>
+          ${selection.selectedNumbers.length ? `<div><strong>Your picks · ${score ? `${chosenHits.length} of ${selection.selectedNumbers.length} hit` : `${selection.selectedNumbers.length} selected · Pending`}</strong>${numberStrip(selection.selectedNumbers, chosenHits)}</div>` : '<p>Whole pool saved; no individual picks.</p>'}
+          <details ${score ? 'open' : ''}><summary>Full pool · ${selection.poolNumbers.length} numbers${score ? ` · covered ${poolHits.length} of 5 drawn` : ' · Pending'}</summary>${numberStrip(selection.poolNumbers, poolHits)}</details>
+        </article>`;
+      }).join('');
+      const autoDecision = session.automaticSelection;
+      const autoScore = autoDecision && session.result ? scoreAutomaticPivot(autoDecision, { date: session.result.date, numbers: session.result.numbers }) : null;
+      const autoMarkup = autoDecision ? `<article class="saved-pool-selection"><strong>Automatic pivot ${autoDecision.pivots.join(' + ')}</strong><p>${autoScore ? `Pool covered ${autoScore.matchedNumbers.length} of 5 drawn · ${autoScore.pickedWinningPivot ? 'Chosen pivot tied for or had the most hits' : `Best pivot: ${autoScore.winningPivots.join(', ')}`}` : `Pending · based on ${autoDecision.historyDraws} drawings through ${escapeHTML(autoDecision.sourceDate)}`}</p><details><summary>Automatic pool · ${autoDecision.poolNumbers.length} numbers</summary>${numberStrip(autoDecision.poolNumbers, autoScore?.matchedNumbers)}</details></article>` : '';
       const targetDrawingDate = sessionTargetDrawingDate(session);
       const resultMarkup = session.result ? `<div class="session-actual">
         <span><small>Official result</small></span>${numberStrip(session.result.numbers)}
@@ -1862,7 +1968,7 @@ export class Cash5StudioApp {
       return `<section class="session-card ${session.status} ${session.kind || 'legacy'}">
         <div class="session-head"><strong class="session-target-date">For Drawing ${escapeHTML(targetDrawingDate)}</strong><span>${session.result ? 'Scored' : 'Pending'}</span></div>
         ${resultMarkup}
-        <div class="session-picks">${rowMarkup}</div>
+        <div class="session-picks">${autoMarkup}${poolMarkup}${rowMarkup}</div>
         <div class="session-actions">
           <button class="mini-btn" data-copy-session="${escapeHTML(session.id)}">Copy lines</button>
           ${typeof window.cash5StudioNativeShare === 'function' ? `<button class="mini-btn" data-share-session="${escapeHTML(session.id)}">Share…</button>` : ''}

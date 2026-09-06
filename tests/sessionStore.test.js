@@ -81,6 +81,18 @@ test('locked slips format cleanly for copying into iMessage', () => {
   ].join('\n'));
 });
 
+test('shared prediction text includes user-selected pool numbers', () => {
+  const text = formatSessionForMessage({
+    kind: 'prediction',
+    baselineDate: '2026-01-10',
+    analyzerVersion: 13,
+    rows: [{ source: 'system', id: 'system-core', role: 'core', available: true, numbers: [1, 5, 12, 23, 42] }],
+    poolSelections: [{ selectedNumbers: [42, 3, 10, 3] }]
+  });
+  assert.match(text, /Core: 01 - 05 - 12 - 23 - 42/);
+  assert.match(text, /Pool selection 1 — your picks: 03 - 10 - 42/);
+});
+
 test('pending sessions return to the Ticket Builder while scored sessions are copied', () => {
   const row = createDraftRow([1, 5, 12, 23, 42]);
   const pending = finalizeSession({ fullCandidates: [], draftRows: [row] }, { id: 'base', date: '2026-01-10' });
@@ -104,7 +116,7 @@ test('prediction ledger backfills ten scored dates and leaves one pending withou
   assert.equal(sessions[0].baselineDate, '2026-08-04');
   assert.equal(sessions[0].status, 'pending');
   assert.equal(initialized.workspace.predictionTracker.version, 8);
-  assert.ok(sessions.every(session => session.analyzerVersion === 10));
+  assert.ok(sessions.every(session => session.analyzerVersion === 12));
 
   const chronological = [...SAMPLE_CASH_5].sort((a, b) => a.date.localeCompare(b.date));
   const historical = sessions.find(session => session.baselineDate === '2026-07-25');
@@ -120,7 +132,7 @@ test('prediction ledger backfills ten scored dates and leaves one pending withou
   assert.equal(secondPass.workspace.sessions.length, 11);
 });
 
-test('v10 system rows are composed from the ending pool with reasons', () => {
+test('v12 system rows are composed from the ending pool with reasons', () => {
   const first = createPredictionSession(SAMPLE_CASH_5);
   const second = createPredictionSession([...SAMPLE_CASH_5].reverse());
   assert.deepEqual(first.rows, second.rows);
@@ -129,7 +141,7 @@ test('v10 system rows are composed from the ending pool with reasons', () => {
   const available = first.rows.filter(row => row.available);
   assert.ok(available.length >= 1);
   available.forEach(row => {
-    assert.equal(row.analyzerVersion, 10);
+    assert.equal(row.analyzerVersion, 12);
     assert.equal(row.numbers.length, 5);
     assert.equal(new Set(row.numbers).size, 5);
     assert.ok(row.numbers.every((number, index) => index === 0 || number > row.numbers[index - 1]));
@@ -171,7 +183,7 @@ test('model-v9 migration preserves scored sessions and user rows while rebuildin
   assert.equal(migrated.workspace.predictionTracker.version, 8);
   assert.deepEqual(migrated.workspace.sessions.find(session => session.id === scoredV1.id), scoredV1);
   const pending = migrated.workspace.sessions.find(session => session.id === pendingV1.id);
-  assert.equal(pending.analyzerVersion, 10);
+  assert.equal(pending.analyzerVersion, 12);
   assert.equal(pending.rows.filter(row => row.source === 'system').length, 3);
   assert.deepEqual(pending.rows.find(row => row.source !== 'system').numbers, userRow.numbers);
   assert.equal(pending.rows.find(row => row.source !== 'system').note, 'preserve me');
@@ -180,7 +192,7 @@ test('model-v9 migration preserves scored sessions and user rows while rebuildin
     const result = initializePredictionLedger({ sessions: [pendingV1], predictionTracker }, SAMPLE_CASH_5);
     const restored = result.workspace.sessions.find(session => session.id === pendingV1.id);
     assert.equal(result.initialized, true);
-    assert.equal(restored.analyzerVersion, 10);
+    assert.equal(restored.analyzerVersion, 12);
     assert.equal(restored.rows.filter(row => row.source === 'system').length, 3);
     assert.deepEqual(restored.rows.find(row => row.source !== 'system').numbers, userRow.numbers);
   });
@@ -348,4 +360,21 @@ test('historical summary separates system ranks from user lines', () => {
   assert.ok(summary.patterns.families.length >= 7);
   assert.ok(summary.patterns.families.every(item => item.hits <= item.trials));
   assert.ok(summary.groups.every(group => Object.hasOwn(group, 'numberHits') && Object.hasOwn(group, 'exactPositionHits')));
+});
+
+test('v12 migration preserves saved pivot choices, extra rows, and scored v10 sessions', () => {
+  const workbenchSettings = { methodVersion: 2, chooser: 'low', operators: { add: true, direct: true, borrowed: false } };
+  const pending = createPredictionSession(SAMPLE_CASH_5, { workbenchSettings });
+  pending.analyzerVersion = 10;
+  const extra = createDraftRow([1, 5, 12, 23, 42], 'strong', 'Keep this extra line');
+  pending.rows.push(extra);
+  const scored = { ...structuredClone(pending), id: 'scored-v10', status: 'scored', result: { date: '2026-08-05', numbers: [1, 2, 3, 4, 5] } };
+  const workspace = { sessions: [pending, scored], predictionTracker: { version: 8 } };
+  const result = initializePredictionLedger(workspace, SAMPLE_CASH_5);
+  const migrated = result.workspace.sessions.find(session => session.id === pending.id);
+  assert.equal(migrated.analyzerVersion, 12);
+  assert.deepEqual(migrated.workbenchSettings, pending.workbenchSettings);
+  assert.deepEqual(migrated.endingPool, pending.endingPool);
+  assert.deepEqual(migrated.rows.find(row => row.source !== 'system'), extra);
+  assert.deepEqual(result.workspace.sessions.find(session => session.id === scored.id), scored);
 });

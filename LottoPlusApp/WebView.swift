@@ -34,9 +34,9 @@ struct WebView: NSViewRepresentable {
                     webView.appearance = appearance
                     webView.window?.appearance = appearance
                     webView.underPageBackgroundColor = NSColor(
-                        red: isDark ? 23 / 255 : 228 / 255,
-                        green: isDark ? 29 / 255 : 225 / 255,
-                        blue: isDark ? 26 / 255 : 217 / 255,
+                        red: isDark ? 11 / 255 : 232 / 255,
+                        green: isDark ? 18 / 255 : 238 / 255,
+                        blue: isDark ? 32 / 255 : 247 / 255,
                         alpha: 1
                     )
                 }

@@ -290,9 +290,9 @@ test('empty history is empty and the evidence model supports sparse valid histor
   assert.ok(rankings.every(result => result.available && result.candidates.length === 3));
 });
 
-test('version 10 still exposes four independently scored study tracks', () => {
+test('version 12 still exposes four independently scored study tracks', () => {
   const analysis = analyzeNextDrawBoard(CURRENT_FIFTY, { includeWalkForward: false });
-  assert.equal(analysis.version, 10);
+  assert.equal(analysis.version, 12);
   assert.equal(analysis.policy.kind, 'control');
   assert.equal(analysis.policy.patternWeight, 0);
   assert.equal(analysis.policy.historyWeight, 0);
