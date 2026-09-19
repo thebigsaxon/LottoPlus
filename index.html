@@ -73,8 +73,19 @@
     <section class="primary-workspace" aria-label="Cash 5 analysis workspace">
       <article class="surface history-surface">
         <header class="surface-header">
-          <div><span class="eyebrow">Latest 10 drawings</span><h2>Draw History</h2></div>
+          <div><span class="eyebrow" id="historyWindowLabel">Latest 10 drawings</span><h2>Draw History</h2></div>
           <div class="surface-actions">
+            <label class="history-count-control">
+              <span>Past draws</span>
+              <select id="historyDrawCount" aria-label="Number of past draws shown">
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="8">8</option>
+                <option value="10" selected>10</option>
+                <option value="15">15</option>
+                <option value="20">20</option>
+              </select>
+            </label>
             <label class="complete-number-toggle">
               <input type="checkbox" id="chkCompleteNumbers">
               <span>Show complete number</span>
@@ -261,6 +272,13 @@
         </div>
       </details>
 
+      <details class="surface disclosure optional-tool" id="patternLanguageCard">
+        <summary><span><small>Experimental study tool</small><strong>Pattern Language &amp; Pool Reduction</strong></span><span class="summary-action"><span class="summary-open">Open</span><span class="summary-close">Collapse</span></span></summary>
+        <div class="disclosure-body pattern-language-study" id="patternLanguageStudy" aria-live="polite">
+          <div class="empty-state">Load at least one valid drawing to inspect the deterministic pool study.</div>
+        </div>
+      </details>
+
     </section>
 
     <footer class="app-footer">
@@ -278,6 +296,6 @@
   </aside>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  <script type="module" src="js/app.js?v=63"></script>
+  <script type="module" src="js/app.js?v=64"></script>
 </body>
 </html>

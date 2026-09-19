@@ -34,6 +34,9 @@ test('Cash 5 Studio shell exposes contextual pattern, annotation, and session su
   assert.match(html, />Winning Patterns</);
   assert.match(html, /class="complete-number-toggle"/);
   assert.match(html, />Show complete number</);
+  assert.match(html, /id="historyDrawCount"/);
+  [3, 5, 8, 10, 15, 20].forEach(count => assert.match(html, new RegExp(`<option value="${count}"`)));
+  assert.match(html, /id="historyWindowLabel"/);
   assert.ok(html.indexOf('id="chkCompleteNumbers"') < html.indexOf('id="btnPatterns"'));
   assert.match(html, /id="futureDigitGrid"/);
   assert.match(html, /id="composerCard"/);
@@ -123,6 +126,12 @@ test('position highlighting, click-off Patterns, and native sharing are wired', 
   assert.match(appSource, /data-workbench-operator/);
   assert.match(appSource, /composePoolLines\(workbench\)/);
   assert.match(appSource, /detectNumberTheme\(this\.filteredDraws\)/);
+  assert.match(appSource, /filterAndSortDraws\(this\.draws, \{[\s\S]*limit: this\.historyDrawCount/);
+  assert.match(appSource, /const analysisDraws = \[\.\.\.this\.filteredDraws, preview\]/);
+  assert.match(appSource, /this\.updateLines\(analysisDraws\)/);
+  assert.match(appSource, /this\.filteredDraws = cash5AnalysisWindow\(this\.draws\)/);
+  assert.match(appSource, /this\.historyDrawCountSelect\.addEventListener\("change"/);
+  assert.match(appSource, /heatHistoryDraws: this\.researchDraws/);
   assert.match(appSource, /Whole-number theme live/);
   assert.match(appSource, /data-use-theme-line/);
   assert.match(appSource, /system-reason/);
@@ -210,7 +219,10 @@ test('HNCDE rows contain each digit group and enlarge only the hovered card', as
   ]);
   assert.match(gridSource, /class="row-hcn-values"/);
   assert.match(styles, /\.row-hcn-digits \{ display: flex;/);
-  assert.match(styles, /\.grid-table th\.hcn-column-heading \{ width: 226px;/);
+  assert.match(styles, /\.grid-table th\.hcn-column-heading \{ width: clamp\(200px, 29vw, 226px\);/);
+  assert.match(styles, /--history-cell-gap: clamp\(2px, \.25vw, 3px\);/);
+  assert.match(styles, /--history-cell-size: clamp\(48px, 5vw, 64px\);/);
+  assert.match(styles, /\.square-cell \{[^}]*max-width: 64px; max-width: var\(--history-cell-size, 64px\);/s);
   assert.match(styles, /\.row-hcn-digits \.row-hcn-group \{ flex: 0 1 auto; \}/);
   assert.match(styles, /\.row-hcn-values \{ min-width: 0; overflow: hidden; display: flex;/);
   assert.match(styles, /\.row-hcn-box \{[^}]*overflow: hidden;[^}]*cursor: zoom-in;/s);

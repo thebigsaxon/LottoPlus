@@ -29,6 +29,30 @@ test('screenshot row produces the expected low, high, and combined pools', () =>
   assert.ok([0, 7, 2, 7, 8].every(digit => buildPivotPool(SCREENSHOT_ROW, 'both').digits.includes(digit)));
 });
 
+test('end-to-end walks from the first unique ending and back from the last unique ending', () => {
+  const pool = buildPivotPool(SCREENSHOT_ROW, 'end-to-end');
+  assert.equal(pool.valid, true);
+  assert.deepEqual(pool.pivots.map(item => item.column), [0, 4]);
+  assert.deepEqual(pool.digits, [2, 3, 5, 7, 8]);
+  assert.ok(pool.candidates.flatMap(item => item.evidence).every(item => item.pivotKind === 'end-to-end'));
+});
+
+test('end-to-end uses the last occurrence of each ending when walking back', () => {
+  const pool = buildPivotPool([15, 25, 28, 38, 7], 'end-to-end');
+  assert.deepEqual(pool.pivots.map(item => [item.column, item.digit]), [[0, 5], [4, 7]]);
+  assert.equal(pool.candidates.flatMap(item => item.evidence)
+    .some(item => item.pivotColumn === 4 && item.otherColumn === 3), true);
+});
+
+test('neighbor pools use only touching unique endings in row order', () => {
+  const pool = buildPivotPool(SCREENSHOT_ROW, 'neighbors');
+  assert.equal(pool.valid, true);
+  assert.deepEqual(pool.digits, [0, 2, 3, 7, 8]);
+  const pairs = pool.candidates.flatMap(item => item.evidence)
+    .map(item => [item.pivotColumn, item.otherColumn]);
+  assert.ok(pairs.every(([left, right]) => right === left + 1));
+});
+
 test('Pivot Pools retain modulo-addition and borrowed-difference equations', () => {
   const pool = buildPivotPool(SCREENSHOT_ROW, 'both');
   const explanations = pool.candidates.flatMap(candidate => candidate.evidence.map(item => item.explanation));

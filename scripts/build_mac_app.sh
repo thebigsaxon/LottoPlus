@@ -65,3 +65,15 @@ if [ -d "$LEGACY_APP/Contents/Resources" ]; then
     codesign --force --deep --sign - "$LEGACY_APP"
     echo "Updated legacy launcher $LEGACY_APP"
 fi
+
+# Keep the earlier Lotto Studio bundle current as well; it uses the same
+# WebKit loader and bundle identifier but may still be the user's launcher.
+LEGACY_STUDIO_APP="$OUTPUT_DIR/Lotto Studio.app"
+if [ -d "$LEGACY_STUDIO_APP/Contents/Resources" ]; then
+    cp index.html "$LEGACY_STUDIO_APP/Contents/Resources/index.html"
+    cp -R css "$LEGACY_STUDIO_APP/Contents/Resources/"
+    cp -R js "$LEGACY_STUDIO_APP/Contents/Resources/"
+    touch "$LEGACY_STUDIO_APP"
+    codesign --force --deep --sign - "$LEGACY_STUDIO_APP"
+    echo "Updated legacy launcher $LEGACY_STUDIO_APP"
+fi

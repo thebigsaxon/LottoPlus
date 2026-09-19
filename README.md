@@ -8,7 +8,7 @@ The toolbar includes persistent low-glare Light and Dark themes. **Update Draws*
 
 ## Arrange your workspace
 
-Each of the six workspace cards has a drag handle in its top bar and a resize corner at the bottom right. Drag the handle onto another card to move it to that position. Drag the corner to change width and height; widths snap to the workspace columns. Your layout is saved locally and restored when the app opens.
+Each workspace card has a drag handle in its top bar and a resize corner at the bottom right. Drag the handle onto another card to move it to that position. Drag the corner to change width and height; widths snap to the workspace columns. Your layout is saved locally and restored when the app opens.
 
 Cards reflow and scale to their available space while keeping text at least 9px at the supported interface zoom levels. Content-sized cards grow with expanded sections. Manually sized cards scroll only when readable content no longer fits. **Fit content** restores automatic height for one card; **Reset layout** restores all default positions and sizes. Narrow windows stack the cards while retaining their saved widths for larger windows.
 
@@ -49,6 +49,8 @@ Historical evaluation remains available in the data module, comparing observed e
 
 Click numbers in the pool to toggle your selection, then choose **Save selections**. With no individual numbers selected, **Save pool** records the whole pool. Each save stores an immutable snapshot of the full pool, selected subset, pivot settings, and timestamp in the pending drawing’s Saved Sessions entry. Identical saves are deduplicated; different selections become separate records. Saved Sessions highlights exact-number hits for the chosen subset and reports how many of the five winning numbers the full pool covered. Pool selections are separate from five-number ticket statistics. Draft picks survive reopening, are restricted to the active pool, and reset when the source drawing advances.
 
+**Update Draws** also saves your current pool selections, drafted rows, and any complete five-number line in **Your pick** against the original drawing before checking new results. Find those numbers and their matches in **Saved Sessions**. Refreshes with no new drawing keep your selections visible; when a new result arrives, saved complete entries move out of the editor. Incomplete picks remain in the editor, and automatic range updates preserve explicitly chosen numbers.
+
 **Clear selections & pick** clears mapped highlights and the unsaved extra pick. Generated system lines, drafted extra rows, and saved sessions remain. Changing a pivot updates the full-number grid and keeps Options and Reference open. The pool expansion rejects invalid endings, removes duplicates, excludes zero as a full number, and sorts the eligible 1–42 values numerically.
 
 ## Development
@@ -70,6 +72,14 @@ npm run evaluate:v7
 npm run evaluate:v9
 npm run evaluate:pivot
 ```
+
+The experimental full-number selector and draw-pattern language run separately from live ticket generation:
+
+```bash
+npm run evaluate:pool
+```
+
+The [20-draw study](reports/pool-reduction-report.md) compares nested 20/18/16-number pools against a balanced control and fixed evidence ablations. The interactive [draw explorer](reports/pool-reduction-report.html) shows matches, misses, score contributions, and historical pattern support. The [observation journal](reports/pattern-observation-journal.md) records intuition before a result. Recent supplementary data ends September 11, 2026; that last result came from the user's screenshot. These are fixed-policy retrospective diagnostics, not a validated predictive model.
 
 Build the native application with Xcode command-line tools:
 

@@ -9,7 +9,8 @@
     "evaluate:v6": "node scripts/evaluate_v6.js",
     "evaluate:v7": "node scripts/evaluate_v7_endings.js",
     "evaluate:v9": "node scripts/evaluate_v9.js",
-    "evaluate:pivot": "node scripts/evaluate_auto_pivot.js"
+    "evaluate:pivot": "node scripts/evaluate_auto_pivot.js",
+    "evaluate:pool": "node scripts/evaluate_pool_reduction.js && node scripts/render_pool_report.js"
   },
   "keywords": [
     "lottery",

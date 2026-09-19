@@ -3,11 +3,13 @@
 export const PIVOT_POOL_MODES = Object.freeze({
   LOW: 'low',
   HIGH: 'high',
-  BOTH: 'both'
+  BOTH: 'both',
+  END_TO_END: 'end-to-end',
+  NEIGHBORS: 'neighbors'
 });
 
 export function normalizePivotPoolMode(mode) {
-  if (mode === PIVOT_POOL_MODES.LOW || mode === PIVOT_POOL_MODES.HIGH) return mode;
+  if (Object.values(PIVOT_POOL_MODES).includes(mode)) return mode;
   return PIVOT_POOL_MODES.BOTH;
 }
 
@@ -65,6 +67,74 @@ function pivotRelationships(pivot, other) {
     otherDigit: other.digit,
     otherColumn: other.column
   }));
+}
+
+function uniqueEndingCells(endings, direction = 1) {
+  const cells = direction === 1 ? endings : [...endings].reverse();
+  const seen = new Set();
+  return cells.filter(cell => {
+    if (seen.has(cell.digit)) return false;
+    seen.add(cell.digit);
+    return true;
+  });
+}
+
+function pairKey(first, second) {
+  return [first.column, second.column].sort((left, right) => left - right).join(':');
+}
+
+function collectPairRelationships(pairs) {
+  const candidates = new Map();
+  const seenPairs = new Set();
+  pairs.forEach(([pivot, other]) => {
+    const key = pairKey(pivot, other);
+    if (seenPairs.has(key)) return;
+    seenPairs.add(key);
+    pivotRelationships(pivot, other).forEach(relationship => {
+      const candidate = candidates.get(relationship.result) || {
+        digit: relationship.result,
+        evidence: []
+      };
+      candidate.evidence.push(relationship);
+      candidates.set(relationship.result, candidate);
+    });
+  });
+  return [...candidates.values()].sort((first, second) => first.digit - second.digit);
+}
+
+/**
+ * Build a row-local pool from the two ends of the unique-ending row.
+ * The first unique ending walks forward across the row; the last unique
+ * ending walks backward. Each unordered pair is included once.
+ */
+function buildEndToEndPool(endings) {
+  const forward = uniqueEndingCells(endings, 1);
+  const backward = uniqueEndingCells(endings, -1);
+  const first = forward[0];
+  const last = backward[0];
+  const pairs = [];
+  if (first) forward.slice(1).forEach(other => pairs.push([
+    { ...first, kind: 'end-to-end', label: 'End to end' }, other
+  ]));
+  if (last) backward.slice(1).forEach(other => pairs.push([
+    { ...last, kind: 'end-to-end', label: 'End to end' }, other
+  ]));
+  return {
+    pivots: [first, last].filter(Boolean).filter((cell, index, all) => all.findIndex(item => item.column === cell.column) === index),
+    candidates: collectPairRelationships(pairs)
+  };
+}
+
+/** Build a pool from every adjacent pair of endings that touch in row order. */
+function buildNeighborPool(endings) {
+  const pairs = [];
+  for (let index = 0; index < endings.length - 1; index += 1) {
+    pairs.push([
+      { ...endings[index], kind: 'neighbors', label: 'Neighbors' },
+      endings[index + 1]
+    ]);
+  }
+  return { pivots: endings, candidates: collectPairRelationships(pairs) };
 }
 
 export function buildPivotCandidatePool(numbers = [], pivotDigit) {
@@ -180,6 +250,19 @@ export function buildPivotPool(numbers = [], mode = PIVOT_POOL_MODES.BOTH) {
   const normalizedMode = normalizePivotPoolMode(mode);
   if (!endings || !definitions.length) {
     return { valid: false, mode: normalizedMode, pivots: [], digits: [], candidates: [] };
+  }
+
+  if (normalizedMode === PIVOT_POOL_MODES.END_TO_END || normalizedMode === PIVOT_POOL_MODES.NEIGHBORS) {
+    const built = normalizedMode === PIVOT_POOL_MODES.END_TO_END
+      ? buildEndToEndPool(endings)
+      : buildNeighborPool(endings);
+    return {
+      valid: true,
+      mode: normalizedMode,
+      pivots: built.pivots,
+      digits: built.candidates.map(candidate => candidate.digit),
+      candidates: built.candidates
+    };
   }
 
   const pivots = definitions.length === 1

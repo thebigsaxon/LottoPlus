@@ -28,6 +28,46 @@ function makeCell(digit, column, type = 'ones', drawId = '') {
   };
 }
 
+test('Next row retains official HNCDE for empty, partial, and complete picks', () => {
+  const official = [
+    { id: 'd5', date: '2026-09-05', numbers: [3, 7, 8, 12, 32] },
+    { id: 'd6', date: '2026-09-06', numbers: [4, 9, 11, 15, 37] },
+    { id: 'd7', date: '2026-09-07', numbers: [3, 12, 20, 25, 27] },
+    { id: 'd8', date: '2026-09-08', numbers: [7, 13, 20, 28, 37] }
+  ];
+  const container = { innerHTML: '', querySelectorAll() { return []; } };
+  const matrix = new GridMatrix(container);
+  const heatCells = () => [...container.innerHTML.matchAll(/<td class="row-hcn-cell">([\s\S]*?)<\/td>/g)].map(match => match[1]);
+  const digits = (cell, tier) => {
+    const group = cell.match(new RegExp(`row-hcn-${tier}"><b>[\\s\\S]*?<span class="row-hcn-values">([\\s\\S]*?)</span>`))[1];
+    return [...group.matchAll(/>(\d)<\/i>/g)].map(match => Number(match[1]));
+  };
+  matrix.setDraws(official);
+  const latest = heatCells().at(-1);
+  assert.deepEqual(digits(latest, 'hot'), [3, 7, 0]);
+  assert.deepEqual(digits(latest, 'declining'), [5]);
+  assert.deepEqual(digits(latest, 'cold'), [6]);
+  assert.deepEqual(digits(latest, 'neutral'), [1, 2, 4, 8, 9]);
+  assert.deepEqual(digits(latest, 'emerging'), []);
+
+  for (const picks of [[], [7], [1, 2, 4, 6, 9]]) {
+    const preview = createNextDrawingPreview(picks, '2026-09-08');
+    // Exercise both the default timeline and a supplied history with hidden rows.
+    for (const options of [{ heatHistoryDraws: [] }, { heatHistoryDraws: [...official, preview] }]) {
+      matrix.setDraws([...official, preview], 'cash5', options);
+      assert.equal(heatCells().at(-1), latest);
+      assert.equal(heatCells().at(-2), latest);
+    }
+    matrix.setDraws([official.at(-1), preview], 'cash5', { heatHistoryDraws: official });
+    assert.deepEqual(heatCells(), [latest, latest]);
+  }
+
+  // Once an actual result omits 7 after its hot streak, Declining is appropriate.
+  const result = { id: 'd9', date: '2026-09-09', numbers: [1, 2, 4, 6, 9] };
+  matrix.setDraws([...official, result], 'cash5', { heatHistoryDraws: [] });
+  assert.deepEqual(digits(heatCells().at(-1), 'declining'), [3, 7, 0]);
+});
+
 test('mapped future digits highlight matching cells in ending and complete-number modes', () => {
   const sameColumn = makeCell(5, 1);
   const otherColumn = makeCell(5, 4);

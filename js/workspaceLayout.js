@@ -6,7 +6,8 @@ export const PANEL_DEFAULTS = [
   { id: 'pick', selector: '#composerCard', title: 'Your pick', span: 12 },
   { id: 'sequences', selector: '.analysis-panels > details:nth-child(1)', title: 'Similar Sequences', span: 6 },
   { id: 'evidence', selector: '.analysis-panels > details:nth-child(2)', title: 'Number Evidence', span: 6 },
-  { id: 'performance', selector: '#historicalPerformanceCard', title: 'Historical Performance', span: 12 }
+  { id: 'performance', selector: '#historicalPerformanceCard', title: 'Historical Performance', span: 12 },
+  { id: 'patternLanguage', selector: '#patternLanguageCard', title: 'Pattern Language', span: 12 }
 ];
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -71,11 +72,7 @@ export class WorkspaceLayout {
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') item.height = clamp((item.height ?? panel.offsetHeight) + (e.key === 'ArrowDown' ? 40 : -40), 180, 2400);
         this.save(); this.schedule();
       });
-      panel.querySelector('.panel-fit').addEventListener('click', () => {
-        this.layout.find(item => item.id === def.id).height = null;
-        this.save(); this.schedule();
-        this.announce(`${def.title} fits its contents.`);
-      });
+      panel.querySelector('.panel-fit').addEventListener('click', () => this.fitContent(def.id));
     }
     main.querySelector('.primary-workspace')?.remove();
     main.querySelector('.analysis-panels')?.remove();
@@ -94,6 +91,18 @@ export class WorkspaceLayout {
 
   announce(text) { this.status.textContent = text; }
   save() { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(this.layout)); } catch { /* Session-only layout when storage is unavailable. */ } }
+  fitContent(id, announce = true) {
+    const item = this.layout.find(entry => entry.id === id);
+    if (!item) return false;
+    item.height = null;
+    this.save();
+    this.schedule();
+    if (announce) {
+      const title = PANEL_DEFAULTS.find(def => def.id === id)?.title || id;
+      this.announce(`${title} fits its contents.`);
+    }
+    return true;
+  }
   schedule() {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => { this.frame = null; this.render(); });
@@ -101,6 +110,7 @@ export class WorkspaceLayout {
   render() {
     const width = this.dashboard.clientWidth;
     const outerZoom = Number(this.main.style.zoom) || 1;
+    const measurements = new Map();
     for (const item of this.layout) {
       const panel = this.panels.get(item.id);
       const viewport = panel.querySelector('.panel-viewport');
@@ -119,11 +129,9 @@ export class WorkspaceLayout {
         return content.scrollHeight * value;
       };
       let naturalHeight = measure(scale);
-      const availableHeight = item.height === null
-        ? (['history', 'board'].includes(item.id)
-          ? Math.max(400, (innerHeight - this.dashboard.getBoundingClientRect().top) / outerZoom - 60) : Infinity)
-        : item.height - 48;
-      // Fit vertically before scrolling; never shrink text below 9 rendered pixels.
+      const availableHeight = item.height === null ? Infinity : item.height - 48;
+      // Content-fit cards grow with their contents. Only an explicitly resized card
+      // is allowed to shrink its contents to fit its saved height.
       if (naturalHeight > availableHeight && scale > minScale) {
         let low = minScale, high = scale;
         for (let i = 0; i < 7; i++) {
@@ -133,7 +141,23 @@ export class WorkspaceLayout {
         scale = low;
         naturalHeight = measure(scale);
       }
-      const targetHeight = item.height ?? naturalHeight + 48;
+      measurements.set(item.id, { item, panel, viewport, content, availableWidth, scale, naturalHeight });
+    }
+
+    const sharedAutoCardIds = new Set(['history', 'board']);
+    const sharedAutoCardMeasurements = [...measurements.values()]
+      .filter(measurement => sharedAutoCardIds.has(measurement.item.id) && measurement.item.height === null);
+    const sharedAutoHeight = sharedAutoCardMeasurements.length === 2
+      ? Math.max(...sharedAutoCardMeasurements.map(measurement => measurement.naturalHeight + 48))
+      : null;
+
+    for (const item of this.layout) {
+      const { panel, viewport, content, availableWidth, scale, naturalHeight } = measurements.get(item.id);
+      const targetHeight = item.height ?? (
+        sharedAutoCardIds.has(item.id) && sharedAutoHeight !== null
+          ? sharedAutoHeight
+          : naturalHeight + 48
+      );
       const rows = Math.ceil((targetHeight + 12) / 20);
       panel.style.gridRowEnd = `span ${rows}`;
       viewport.style.height = `${rows * 20 - 12 - 48}px`;

@@ -6,7 +6,8 @@ import { nextCalendarDate } from './dateUtils.js?v=1';
 import {
   buildPivotDefinitions,
   buildPivotPool,
-  buildWinningPivotTimeline
+  buildWinningPivotTimeline,
+  PIVOT_POOL_MODES
 } from './pivotPools.js?v=2';
 
 export { nextCalendarDate } from './dateUtils.js?v=1';
@@ -97,7 +98,9 @@ export class GridMatrix {
     const winningPivotTimeline = buildWinningPivotTimeline(this.draws);
     const winningPivotByTargetId = new Map(winningPivotTimeline.map(item => [item.targetDrawId, item]));
     const heatHistory = this.options.heatHistoryDraws?.length ? this.options.heatHistoryDraws : this.draws;
-    const heatByDrawId = new Map(buildDigitHeatTimeline(heatHistory).map(item => [String(item.draw.id), item]));
+    // Picks are not results: even a complete preview must not advance heat states.
+    const heatTimeline = buildDigitHeatTimeline(heatHistory.filter(draw => !draw.preview));
+    const heatByDrawId = new Map(heatTimeline.map(item => [String(item.draw.id), item]));
     const header = `<thead><tr><th>Draw date</th>${Array.from({ length: 5 }, (_, index) => (
       `<th>Ball ${index + 1}</th>${index < 4 ? '<th class="ball-sep"></th>' : ''}`
     )).join('')}${showPivotPools ? '<th class="pivot-column-heading">Pivots</th>' : ''}<th class="hcn-column-heading">HNCDE status</th>${showWinningPivotPoints ? '<th class="winning-pivot-column-heading">Winning pivot</th>' : ''}</tr></thead>`;
@@ -121,7 +124,7 @@ export class GridMatrix {
               aria-label="Inspect winning pivots for ${safeDate}" ${String(activeWinningPivotDrawId) === String(draw.id) ? 'checked' : ''}>
           </label>`
         : '';
-      const heat = heatByDrawId.get(String(draw.id));
+      const heat = draw.preview ? heatTimeline.at(-1) : heatByDrawId.get(String(draw.id));
       const emerging = new Set(heat?.emergingDigits || []);
       const heatDigits = (tier, label, showCount = false) => `<span class="row-hcn-group row-hcn-${tier}"><b>${label}${showCount ? `<sup>${heat?.[tier]?.length || 0}</sup>` : ''}</b><span class="row-hcn-values">${(heat?.[tier] || []).map(item => (
         `<i class="row-hcn-digit${emerging.has(item.digit) ? ' is-emerging' : ''}" title="${emerging.has(item.digit) ? `${item.digit} moved from Cold to Drawn` : `${item.digit}: ${tier}`}">${item.digit}</i>`
@@ -144,6 +147,15 @@ export class GridMatrix {
           pivotControls = pivotButton('both', 'P', pivotDefinitions[0].digit);
         } else if (pivotDefinitions.length === 2) {
           pivotControls = `${pivotButton('low', 'L', pivotDefinitions[0].digit)}${pivotButton('high', 'H', pivotDefinitions[1].digit)}${pivotButton('both', 'Both')}`;
+        }
+        if (pivotDefinitions.length) {
+          const selectedMode = activePivotReference?.mode || PIVOT_POOL_MODES.BOTH;
+          const strategyOptions = [
+            [PIVOT_POOL_MODES.BOTH, 'Both pivots'],
+            [PIVOT_POOL_MODES.END_TO_END, 'End to end'],
+            [PIVOT_POOL_MODES.NEIGHBORS, 'Neighbors']
+          ].map(([value, label]) => `<option value="${value}" ${selectedMode === value && isActivePivotRow ? 'selected' : ''}>${label}</option>`).join('');
+          pivotControls += `<select class="pivot-strategy-select" data-pivot-draw-id="${safeId}" aria-label="Pivot pool strategy for ${safeDate}" title="Choose a pivot pool strategy">${strategyOptions}</select>`;
         }
         pivotCell = `<td class="pivot-cell"><div class="pivot-controls">${pivotControls}</div></td>`;
       }
@@ -193,6 +205,12 @@ export class GridMatrix {
       button.addEventListener('click', event => {
         event.stopPropagation();
         this.onPivotReferenceChangeCallback?.(button.dataset.pivotDrawId, button.dataset.pivotMode);
+      });
+    });
+    this.container.querySelectorAll('.pivot-strategy-select').forEach(select => {
+      select.addEventListener('change', event => {
+        event.stopPropagation();
+        this.onPivotReferenceChangeCallback?.(select.dataset.pivotDrawId, select.value);
       });
     });
     this.container.querySelectorAll('.winning-pivot-row-radio').forEach(input => {

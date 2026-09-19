@@ -10,7 +10,7 @@ import { ConnectionEngine, normalizeManualConnectionChains } from './connectionE
 import { createNextDrawingPreview, GridMatrix, NEXT_DRAWING_PREVIEW_ID } from './gridMatrix.js?v=19';
 import { fetchLiveCash5Update } from './liveFetcher.js?v=4';
 import { validateProject, validateDraw, escapeHTML } from './validation.js?v=13';
-import { cash5AnalysisWindow, cash5ResearchWindow } from './drawFilters.js?v=2';
+import { cash5AnalysisWindow, cash5ResearchWindow, filterAndSortDraws } from './drawFilters.js?v=2';
 import { findBoardSimilarSequences } from './motifEngine.js?v=4';
 import { buildNumberEvidence } from './evidenceEngine.js';
 import { classifyOnesHeat } from './onesAnalysis.js';
@@ -48,6 +48,8 @@ import {
   toggleManualPivot
 } from './pivotWorkbench.js?v=4';
 import { composePoolLines, LINE_DESCRIPTIONS, systemLineLabel } from './poolComposer.js?v=4';
+import { forecastReducedPool } from './poolReductionAgent.js?v=1';
+import { AUTOMATIC_PIVOT_ARCHIVE } from './automaticPivotArchive.js?v=1';
 import { detectNumberTheme } from './numberTheme.js?v=1';
 import { sessionTargetDrawingDate } from './dateUtils.js?v=1';
 
@@ -57,6 +59,7 @@ const THEME_KEY = 'cash5studio_theme';
 const JACKPOT_KEY = 'cash5studio_last_jackpot';
 const WORKBENCH_KEY = 'cash5studio_pivot_workbench';
 const SUCCESSOR_RANK_LABELS = ['Top historical successor', 'Second historical successor', 'Third historical successor', 'Honorable mention'];
+const HISTORY_DISPLAY_COUNTS = [3, 5, 8, 10, 15, 20];
 
 function cash5NumberMarkup(number) {
   if (number === null || number === undefined || !Number.isInteger(Number(number))) return '<span class="number-empty">?</span>';
@@ -94,6 +97,7 @@ export class Cash5StudioApp {
     this.draws = [...SAMPLE_CASH_5];
     this.filteredDraws = [...this.draws];
     this.researchDraws = cash5ResearchWindow(this.draws);
+    this.historyDrawCount = 10;
     this.manualLines = [];
     this.autoLines = [];
     this.activeDigitHighlight = null;
@@ -108,6 +112,9 @@ export class Cash5StudioApp {
     this.numberTheme = null;
     this.lastThemeAlertDate = null;
     this.pivotWorkbenchSettings = { ...DEFAULT_WORKBENCH_SETTINGS, operators: { ...DEFAULT_WORKBENCH_SETTINGS.operators }, selectedPivots: [], disabledEquations: [] };
+    this.poolReductionCache = new Map();
+    this.poolReductionSize = 20;
+    this.poolReductionComponent = 'word';
 
     this.patternSettings = {
       showMatches: false,
@@ -185,6 +192,8 @@ export class Cash5StudioApp {
     this.chkWinningPivotPoints = document.getElementById("chkWinningPivotPoints");
     this.chkWinningPatterns = document.getElementById("chkWinningPatterns");
     this.chkCompleteNumbers = document.getElementById("chkCompleteNumbers");
+    this.historyDrawCountSelect = document.getElementById("historyDrawCount");
+    this.historyWindowLabel = document.getElementById("historyWindowLabel");
     this.digitRepeatSummary = document.getElementById("digitRepeatSummary");
     this.pivotPoolReference = document.getElementById("pivotPoolReference");
     this.winningPivotReference = document.getElementById("winningPivotReference");
@@ -212,6 +221,7 @@ export class Cash5StudioApp {
     this.draftRowsContainer = document.getElementById("draftRows");
     this.sessionHistory = document.getElementById("sessionHistory");
     this.historicalPerformance = document.getElementById("historicalPerformance");
+    this.patternLanguageStudy = document.getElementById("patternLanguageStudy");
     this.btnFindMotifs = document.getElementById("btnFindMotifs");
     this.btnClearMotif = document.getElementById("btnClearMotif");
     this.btnAddDraftRow = document.getElementById("btnAddDraftRow");
@@ -625,6 +635,30 @@ export class Cash5StudioApp {
       });
     }
 
+    if (this.historyDrawCountSelect) {
+      this.historyDrawCountSelect.addEventListener("change", (e) => {
+        const selectedCount = Number.parseInt(e.target.value, 10);
+        this.historyDrawCount = HISTORY_DISPLAY_COUNTS.includes(selectedCount) ? selectedCount : 10;
+        e.target.value = String(this.historyDrawCount);
+        this.updateHistoryWindowLabel();
+        this.panelLayout?.fitContent('history', false);
+        this.refreshHistoryMatrix();
+      });
+    }
+
+    this.patternLanguageStudy?.addEventListener('change', event => {
+      const size = event.target.closest('[data-pattern-language-size]');
+      const component = event.target.closest('[data-pattern-language-component]');
+      if (size) {
+        this.poolReductionSize = [16, 18, 20].includes(Number(size.value)) ? Number(size.value) : 20;
+        this.renderPatternLanguageStudy();
+      }
+      if (component) {
+        this.poolReductionComponent = String(component.value || 'word');
+        this.renderPatternLanguageStudy();
+      }
+    });
+
     // File Action Buttons
     if (this.btnImportCsv && this.csvFileInput) {
       this.btnImportCsv.addEventListener("click", () => this.csvFileInput.click());
@@ -759,7 +793,7 @@ export class Cash5StudioApp {
     if (update.draws.ok) {
       drawCount = update.draws.value.length;
       const previousDraws = this.draws;
-      const reconciliation = reconcileOfficialDraws(this.workspace, previousDraws, update.draws.value);
+      const reconciliation = reconcileOfficialDraws(this.workspace, previousDraws, update.draws.value, new Date(), this.pivotWorkbenchSettings);
       this.workspace = reconciliation.workspace;
       this.draws = update.draws.value;
       this.manualLines = [];
@@ -824,7 +858,12 @@ export class Cash5StudioApp {
       nextDrawingPreviewNumbers(this.workspace, latestDrawDate),
       latestDrawDate
     );
-    const displayDraws = [...this.filteredDraws, preview];
+    const historyDraws = filterAndSortDraws(this.draws, {
+      sortOrder: 'asc',
+      limit: this.historyDrawCount
+    });
+    const displayDraws = [...historyDraws, preview];
+    const analysisDraws = [...this.filteredDraws, preview];
     const historyHighlights = [...(this.workspace.futureDigitMap || []), ...(this.workspace.systemDigitMap || [])]
       .filter((item, index, values) => values.findIndex(candidate => (
         candidate.column === item.column && candidate.digit === item.digit
@@ -844,6 +883,7 @@ export class Cash5StudioApp {
       [...this.winningPatternDrawIds].filter(drawId => officialIds.has(String(drawId)) || drawId === NEXT_DRAWING_PREVIEW_ID)
     );
     this.numberTheme = detectNumberTheme(this.filteredDraws);
+    this.updateHistoryWindowLabel();
     if (this.numberTheme.intensity === 'alert') {
       const latestThemeDate = this.numberTheme.window.at(-1)?.date || '';
       if (latestThemeDate && this.lastThemeAlertDate !== latestThemeDate) {
@@ -855,11 +895,11 @@ export class Cash5StudioApp {
       }
     }
     const rowRoles = { [preview.id]: 'next' };
-    if (this.filteredDraws.length >= 2) {
-      rowRoles[this.filteredDraws[this.filteredDraws.length - 2].id] = 'past';
-      rowRoles[this.filteredDraws[this.filteredDraws.length - 1].id] = 'present';
-    } else if (this.filteredDraws.length === 1) {
-      rowRoles[this.filteredDraws[0].id] = 'present';
+    if (historyDraws.length >= 2) {
+      rowRoles[historyDraws[historyDraws.length - 2].id] = 'past';
+      rowRoles[historyDraws[historyDraws.length - 1].id] = 'present';
+    } else if (historyDraws.length === 1) {
+      rowRoles[historyDraws[0].id] = 'present';
     }
     if (this.gridMatrix) {
       this.gridMatrix.setDraws(displayDraws, 'cash5', {
@@ -873,13 +913,19 @@ export class Cash5StudioApp {
         selectableContextRows: false,
         showWinningRowSelectors: this.patternSettings.showWinningPatterns,
         winningPatternDrawIds: [...this.winningPatternDrawIds],
-        heatHistoryDraws: [...this.researchDraws, preview],
+        heatHistoryDraws: this.researchDraws,
         themeNumbers: this.numberTheme?.active ? this.numberTheme.numbersInPlay : [],
         themeDrawIds: this.numberTheme?.active ? this.numberTheme.drawIds : []
       });
       this.gridMatrix.setPositionHighlights(historyHighlights);
     }
-    this.updateLines(displayDraws);
+    this.updateLines(analysisDraws);
+  }
+
+  updateHistoryWindowLabel() {
+    if (!this.historyWindowLabel) return;
+    const count = HISTORY_DISPLAY_COUNTS.includes(this.historyDrawCount) ? this.historyDrawCount : 10;
+    this.historyWindowLabel.textContent = `Latest ${count} drawing${count === 1 ? '' : 's'}`;
   }
 
   updateState() {
@@ -888,6 +934,7 @@ export class Cash5StudioApp {
     this.renderPivotPoolReference();
     this.renderWinningPivotReference();
     this.renderNumberThemeAlerts();
+    this.renderPatternLanguageStudy();
     this.updateLatestDrawStatus();
     this.updateJackpotStatus();
     this.saveToLocalStorage();
@@ -909,6 +956,69 @@ export class Cash5StudioApp {
     this.digitRepeatSummary.innerHTML = groups.map(([tier, label, accessibleLabel, items]) => `
       <div class="summary-group summary-${tier}"><strong aria-label="${accessibleLabel}">${label}</strong><span class="summary-digits">${items.length ? items.map(displayItem).join("") : displayItem(null)}</span></div>
     `).join("");
+  }
+
+  renderPatternLanguageStudy() {
+    if (!this.patternLanguageStudy) return;
+    const valid = (Array.isArray(this.draws) ? this.draws : [])
+      .filter(draw => !draw?.preview && Array.isArray(draw?.numbers) && draw.numbers.length === 5);
+    if (!valid.length) {
+      this.patternLanguageStudy.innerHTML = '<div class="empty-state">Load at least one valid drawing to inspect the deterministic pool study.</div>';
+      return;
+    }
+
+    const ordered = [...valid].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    const sourceKey = `${ordered.at(-1).date}:${ordered.at(-1).numbers.join(',')}:${ordered.length}`;
+    let study = this.poolReductionCache.get(sourceKey);
+    if (!study) {
+      try {
+        const throughDate = ordered.at(-1).date;
+        study = forecastReducedPool([...AUTOMATIC_PIVOT_ARCHIVE, ...ordered], { throughDate });
+        this.poolReductionCache.set(sourceKey, study);
+        if (this.poolReductionCache.size > 6) this.poolReductionCache.delete(this.poolReductionCache.keys().next().value);
+      } catch (error) {
+        this.patternLanguageStudy.innerHTML = `<div class="empty-state">The study could not be built: ${escapeHTML(error.message)}</div>`;
+        return;
+      }
+    }
+
+    const size = [16, 18, 20].includes(Number(this.poolReductionSize)) ? Number(this.poolReductionSize) : 20;
+    const componentKey = String(this.poolReductionComponent || 'word');
+    const component = study.language.components.find(item => item.family === componentKey)
+      || study.language.components.find(item => item.family === 'word');
+    const source = study.language.source;
+    const selected = new Set(study.pools[size] || []);
+    const poolMarkup = [...selected].sort((a, b) => a - b)
+      .map(number => `<span class="pattern-language-number">${String(number).padStart(2, '0')}</span>`).join('');
+    const branchMarkup = component?.successors?.length
+      ? component.successors.map(successor => `
+        <div class="pattern-language-branch"><code>${escapeHTML(successor.code)}</code><small>${successor.count}/${component.support} · ${(Number(successor.shrunkProbability || 0) * 100).toFixed(1)}%</small></div>`).join('')
+      : '<div class="pattern-language-note">No matching historical state. The displayed baseline branches are not evidence of a specific successor.</div>';
+    const labels = { exact: 'Exact letter', word: 'O/L/U word', sequence: 'Two-word sequence', O: 'Odd count', L: 'Low-half count', U: 'Unique endings', C: 'Consecutive pairs', S: 'Spread' };
+    const support = family => study.language.components.find(item => item.family === family)?.support || 0;
+    const selectOptions = Object.entries(labels).map(([key, label]) => `<option value="${key}"${key === component?.family ? ' selected' : ''}>${label}</option>`).join('');
+    const sizeOptions = [20, 18, 16].map(value => `<option value="${value}"${value === size ? ' selected' : ''}>${value} numbers</option>`).join('');
+    const primary = study.pivot.selection.pivots.length ? study.pivot.selection.pivots.join(', ') : 'none';
+    const companion = study.pivot.companion == null ? 'none' : String(study.pivot.companion);
+    this.patternLanguageStudy.innerHTML = `
+      <p class="pattern-language-intro">This is an experimental study track. It translates the latest draw into a compact pattern language, combines pivot support, language lift, and full-number history, then deterministically selects nested pools. It does not change the live system lines.</p>
+      <div class="pattern-language-controls">
+        <label>Pool size<select data-pattern-language-size aria-label="Pattern language pool size">${sizeOptions}</select></label>
+        <label>Read component<select data-pattern-language-component aria-label="Pattern language component">${selectOptions}</select></label>
+        <span class="pattern-language-note">Source ${escapeHTML(study.sourceDate)} · ${study.historyCount} valid drawings</span>
+      </div>
+      <div class="pattern-language-code">${escapeHTML(source.code || 'No pattern code')}</div>
+      <div class="pattern-language-summary">
+        <div class="pattern-language-stat"><b>${primary}</b><span>Primary pivot</span></div>
+        <div class="pattern-language-stat"><b>${companion}</b><span>Parity companion</span></div>
+        <div class="pattern-language-stat"><b>${support('exact')} / ${support('word')}</b><span>Exact / word support</span></div>
+        <div class="pattern-language-stat"><b>${support('sequence')}</b><span>Two-word support</span></div>
+      </div>
+      <div><strong>${size}-number pool</strong><div class="pattern-language-pool" aria-label="Selected deterministic pool">${poolMarkup}</div></div>
+      <div class="pattern-language-history">
+        <div><strong>${escapeHTML(labels[component?.family] || 'Pattern component')} · ${escapeHTML(component?.key || 'baseline')}</strong><div class="pattern-language-branches">${branchMarkup}</div></div>
+        <div><strong>How to read it</strong><p class="pattern-language-note">Letters describe parity, range, endings, adjacency, repetition, spread, and band occupancy. A word groups the coarse O/L/U shape; a sequence joins adjacent words. Sparse matches shrink toward the historical baseline with a fixed prior of 24 observations. Successor percentages describe observed branches only.</p><p class="pattern-language-note">The current pool is a deterministic map, not a probability claim. Record an intuition before the next result in the pattern journal, then score both the match and the miss.</p></div>
+      </div>`;
   }
 
   renderPivotPoolReference() {
@@ -1756,6 +1866,8 @@ export class Cash5StudioApp {
           const position = Number(button.dataset.slipPosition);
           const value = Number(button.dataset.slipNumber);
           this.workspace.slipNumbers[position] = value;
+          this.workspace.slipTensFilters[position] = tensDigitForNumber(value);
+          this.workspace.slipTensSources[position] = 'manual';
           this.workspace.rowBuilder = this.workspace.slipNumbers.filter(Number.isInteger);
           this.renderCash5Workspace();
           this.saveToLocalStorage();
@@ -2049,7 +2161,13 @@ export class Cash5StudioApp {
     };
     try {
       localStorage.setItem("cash5studio_current_project", JSON.stringify(projectData));
-    } catch (e) {}
+      this.storageSaveFailed = false;
+      return true;
+    } catch (e) {
+      if (!this.storageSaveFailed) this.showToast('Your picks could not be saved on this device. Use Data → Save Project before closing the app.');
+      this.storageSaveFailed = true;
+      return false;
+    }
   }
 
   loadFromLocalStorage() {

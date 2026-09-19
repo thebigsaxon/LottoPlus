@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeLayout, panelSpan, PANEL_DEFAULTS } from '../js/workspaceLayout.js';
+import { normalizeLayout, panelSpan, PANEL_DEFAULTS, WorkspaceLayout } from '../js/workspaceLayout.js';
 
 test('damaged or older layout preferences retain every card exactly once', () => {
   const layout = normalizeLayout([{ id: 'board', span: 99, height: -20 }, { id: 'board', span: 4 }, null, { id: 'retired' }, { id: 'history', span: NaN, height: Infinity }]);
@@ -21,4 +21,21 @@ test('narrow windows reflow without overwriting saved wide-window proportions', 
   assert.equal(panelSpan(5, 1600), 5);
   assert.equal(panelSpan(3, 900), 5);
   assert.equal(panelSpan(12, 900), 12);
+});
+
+test('fitting a card clears only its saved height and schedules a relayout', () => {
+  const calls = [];
+  const layout = {
+    layout: [{ id: 'history', height: 720 }, { id: 'board', height: 540 }],
+    save: () => calls.push('save'),
+    schedule: () => calls.push('schedule'),
+    announce: message => calls.push(message)
+  };
+
+  assert.equal(WorkspaceLayout.prototype.fitContent.call(layout, 'history', false), true);
+  assert.deepEqual(layout.layout, [
+    { id: 'history', height: null },
+    { id: 'board', height: 540 }
+  ]);
+  assert.deepEqual(calls, ['save', 'schedule']);
 });

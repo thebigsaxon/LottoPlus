@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "note": "Supplement to cash5-history.json. Aug 30–Sep 10 transcribed from LotteryUSA public results in this task; Sep 11 transcribed from the user's screenshot (not independently verified).",
+  "publicSource": "https://www.lotteryusa.com/south-carolina/palmetto-cash-5/year",
+  "publicThrough": "2026-09-10",
+  "userSuppliedDate": "2026-09-11",
+  "draws": [
+    {"date":"2026-08-30","numbers":[7,11,18,36,37]},
+    {"date":"2026-08-31","numbers":[7,9,16,38,39]},
+    {"date":"2026-09-01","numbers":[2,5,19,20,30]},
+    {"date":"2026-09-02","numbers":[1,18,23,34,38]},
+    {"date":"2026-09-03","numbers":[2,13,26,33,36]},
+    {"date":"2026-09-04","numbers":[5,8,22,28,36]},
+    {"date":"2026-09-05","numbers":[3,7,8,12,32]},
+    {"date":"2026-09-06","numbers":[4,9,11,15,37]},
+    {"date":"2026-09-07","numbers":[3,12,20,25,27]},
+    {"date":"2026-09-08","numbers":[7,13,20,28,37]},
+    {"date":"2026-09-09","numbers":[1,3,11,24,41]},
+    {"date":"2026-09-10","numbers":[6,9,23,24,41]},
+    {"date":"2026-09-11","numbers":[6,8,34,36,40]}
+  ]
+}

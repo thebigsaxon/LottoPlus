@@ -711,14 +711,44 @@ export function initializePredictionLedger(workspace, draws, now = new Date()) {
   };
 }
 
-export function reconcileOfficialDraws(workspace, previousDraws, officialDraws, now = new Date()) {
+/** Capture the current selections against their original drawing before updating results. */
+export function preservePicksForUpdate(workspace, draws, workbenchSettings, now = new Date()) {
+  const history = chronologicalDraws(draws);
+  const latest = history.at(-1);
+  if (!latest || (workspace.sessions || []).some(session => session.kind === 'prediction'
+      && session.baselineDate === latest.date && session.result)) return workspace;
+  let saved = workspace;
+  if (workspace.poolPickDraft?.baselineDate === latest.date && workspace.poolPickDraft.selectedNumbers?.length) {
+    saved = savePoolSelection(saved, history, workbenchSettings, now).workspace;
+  }
+  const rows = [...(workspace.draftRows || [])];
+  if (validateTicketRow(workspace.slipNumbers || []).valid) {
+    rows.push(createDraftRow(workspace.slipNumbers, 'uncertain', '', {
+      tensFilters: workspace.slipTensFilters,
+      tensSources: workspace.slipTensSources
+    }));
+  }
+  if (rows.length) {
+    saved = appendDraftRowsToPendingSession({ ...saved, draftRows: rows }, latest, history, now, workbenchSettings).workspace;
+  }
+  // Keep the editor visible when refreshing returns no new drawing.
+  return { ...saved, poolPickDraft: workspace.poolPickDraft, draftRows: workspace.draftRows };
+}
+
+export function reconcileOfficialDraws(workspace, previousDraws, officialDraws, now = new Date(), workbenchSettings) {
   const previous = chronologicalDraws(previousDraws);
   const official = chronologicalDraws(officialDraws);
   if (!official.length) return { workspace, processedDraws: [] };
+  workspace = preservePicksForUpdate(workspace, previous, workbenchSettings, now);
   const previousLatestDate = previous.at(-1)?.date || '';
   const newDraws = official.filter(draw => draw.date > previousLatestDate);
   if (!newDraws.length) return { workspace, processedDraws: [] };
   let sessions = [...(workspace.sessions || [])];
+  const savedSession = sessions.find(session => session.kind === 'prediction'
+    && session.baselineDate === previousLatestDate && !session.result);
+  const savedUserRows = new Set((savedSession?.rows || [])
+    .filter(row => row.source === 'user').map(row => row.numbers.join(',')));
+  const currentSlip = validateTicketRow(workspace.slipNumbers || []);
 
   newDraws.forEach(actualDraw => {
     sessions = sessions.map(session => (
@@ -740,6 +770,14 @@ export function reconcileOfficialDraws(workspace, previousDraws, officialDraws, 
     processedDraws: newDraws,
     workspace: {
       ...workspace,
+      poolPickDraft: null,
+      draftRows: (workspace.draftRows || []).filter(row => !savedUserRows.has(row.numbers.join(','))),
+      ...(currentSlip.valid && savedUserRows.has(currentSlip.numbers.join(',')) ? {
+        slipNumbers: [null, null, null, null, null],
+        rowBuilder: [],
+        slipTensFilters: [null, null, null, null, null],
+        slipTensSources: ['empty', 'empty', 'empty', 'empty', 'empty']
+      } : {}),
       predictionTracker: {
         version: PREDICTION_TRACKER_VERSION,
         initializedAt: workspace.predictionTracker?.initializedAt || now.toISOString(),
@@ -763,9 +801,14 @@ export function autoSelectTensFilters(workspace, draws) {
   const mappedDigits = Array.from({ length: 5 }, (_, column) => mapped.get(column) ?? null);
   const fixedNumbers = Array.from({ length: 5 }, (_, column) => {
     const value = workspace?.slipNumbers?.[column];
-    return sources[column] === 'manual' && Number.isInteger(value) ? value : null;
+    return Number.isInteger(value) && value >= 1 && value <= 42 ? value : null;
   });
   const nextFilters = filters.map((value, column) => sources[column] === 'manual' ? value : null);
+  fixedNumbers.forEach((number, column) => {
+    if (number === null || sources[column] === 'manual') return;
+    nextFilters[column] = tensDigitForNumber(number);
+    sources[column] = 'manual';
+  });
 
   // A mapped ending can change after range-only choices were saved. If those
   // stale choices make the whole row impossible, release only the ranges that
